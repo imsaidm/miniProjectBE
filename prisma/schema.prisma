@@ -1,9 +1,4 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
+// prisma/schema.prisma
 generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma"
@@ -15,38 +10,306 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id          Int      @id @default(autoincrement())
-  email       String   @unique
-  password    String
-  profile_img String?
-  name        String?
-  posts       Post[]
-  createdAt   DateTime @default(now())
-  role        Role     @default(USER)
-  isVerified  Boolean  @default(false)
-}
-
-model Post {
-  id        Int      @id @default(autoincrement())
-  title     String
-  thumbnail String?
-  content   String
-  published Boolean  @default(false)
-  author    User     @relation(fields: [authorId], references: [id])
-  authorId  Int
-  category  Category
-  createdAt DateTime @default(now())
-}
-
-enum Category {
-  TRAVEL
-  TECHNOLOGY
-  HEALTH
-  FINANCE
-}
-
 enum Role {
-  USER
-  ADMIN
+  CUSTOMER
+  ORGANIZER
+}
+
+enum EventCategory {
+  MUSIC
+  TECH
+  BUSINESS
+  SPORTS
+  ART
+  EDUCATION
+  COMMUNITY
+  OTHER
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELED
+}
+
+enum TransactionStatus {
+  WAITING_PAYMENT 
+  WAITING_ADMIN_CONFIRMATION 
+  DONE
+  REJECTED
+  EXPIRED
+  CANCELED
+}
+
+enum PointsSource {
+  REFERRAL_REWARD
+  PURCHASE_REDEEM
+  ROLLBACK
+  ADMIN_ADJUSTMENT
+}
+
+enum DiscountType {
+  AMOUNT 
+  PERCENT 
+}
+
+model User {
+  id                     Int                     @id @default(autoincrement())
+  email                  String                  @unique
+  password               String
+  name                   String?
+  profileImg             String?
+  role                   Role                    @default(CUSTOMER)
+  isVerified             Boolean                 @default(false)
+  referralCode           String                  @unique
+  referredByCode         String?
+  referralsGiven         Referral[]              @relation("referralsByUser")
+  referralsReceived      Referral?               @relation("referralsOfUser")
+  pointsBalance          Int                     @default(0) 
+  points                 PointEntry[]
+  coupons                Coupon[]
+  transactions           Transaction[]
+  reviews                Review[]
+  attendances            Attendance[]
+  eventsOrganized        Event[]                 @relation("OrganizerEvents")
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  EmailVerificationToken EmailVerificationToken?
+  PasswordResetToken     PasswordResetToken[]
+  Voucher                Voucher[]
+  EmailNotification      EmailNotification[]
+}
+
+model EmailVerificationToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int       @unique
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PasswordResetToken {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  token     String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId])
+}
+
+model Referral {
+  id         Int      @id @default(autoincrement())
+  referrerId Int
+  refereeId  Int      @unique 
+  usedAt     DateTime @default(now())
+  referrer   User     @relation("referralsByUser", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee    User     @relation("referralsOfUser", fields: [refereeId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id             Int           @id @default(autoincrement())
+  organizerId    Int
+  title          String
+  description    String
+  location       String
+  category       EventCategory
+  status         EventStatus   @default(DRAFT)
+  bannerImage    String?
+  startAt        DateTime
+  endAt          DateTime
+  basePriceIDR   Int?
+  totalSeats     Int? 
+  availableSeats Int? 
+  ticketTypes    TicketType[]
+  vouchers       Voucher[] 
+  transactions   Transaction[]
+  reviews        Review[]
+  attendances    Attendance[]
+  organizer      User          @relation("OrganizerEvents", fields: [organizerId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organizerId])
+  @@index([status, startAt])
+  @@index([category, startAt])
+}
+
+model TicketType {
+  id              Int               @id @default(autoincrement())
+  eventId         Int
+  name            String 
+  priceIDR        Int 
+  totalSeats      Int
+  availableSeats  Int 
+  event           Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  TransactionItem TransactionItem[]
+  Attendance      Attendance[]
+
+  @@index([eventId])
+}
+
+model Voucher {
+  id            Int          @id @default(autoincrement())
+  code          String       @unique
+  eventId       Int
+  organizerId   Int
+  discountType  DiscountType @default(AMOUNT)
+  discountValue Int 
+  startsAt      DateTime
+  endsAt        DateTime
+  maxUses       Int? 
+  usedCount     Int          @default(0)
+  isActive      Boolean      @default(true)
+
+  event        Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  organizer    User          @relation(fields: [organizerId], references: [id], onDelete: Cascade)
+  transactions Transaction[] 
+  createdAt    DateTime      @default(now())
+
+  @@index([eventId])
+  @@index([organizerId])
+  @@index([code])
+}
+
+model Coupon {
+  id            Int          @id @default(autoincrement())
+  code          String       @unique
+  userId        Int
+  discountType  DiscountType @default(AMOUNT)
+  discountValue Int 
+  issuedAt      DateTime     @default(now())
+  expiresAt     DateTime
+  isUsed        Boolean      @default(false)
+  usedAt        DateTime?
+  usedByTxnId   Int?
+  owner         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usedByTxn     Transaction? @relation("CouponUse")
+
+  @@index([userId, isUsed])
+  @@index([expiresAt])
+}
+
+model Transaction {
+  id                  Int               @id @default(autoincrement())
+  userId              Int
+  eventId             Int
+  status              TransactionStatus @default(WAITING_PAYMENT)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  paymentDueAt        DateTime 
+  organizerDecisionBy DateTime? 
+  subtotalIDR         Int 
+  discountVoucherIDR  Int               @default(0)
+  discountCouponIDR   Int               @default(0)
+  pointsUsed          Int               @default(0)
+  totalPayableIDR     Int 
+  usedVoucherId       Int?
+  usedCouponId        Int?              @unique
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event               Event             @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  items               TransactionItem[]
+  paymentProof        PaymentProof?
+  voucher             Voucher?          @relation(fields: [usedVoucherId], references: [id])
+  coupon              Coupon?           @relation("CouponUse", fields: [usedCouponId], references: [id])
+  pointEntries        PointEntry[]
+
+  @@index([userId, status])
+  @@index([eventId, status])
+  @@index([paymentDueAt])
+}
+
+model TransactionItem {
+  id            Int         @id @default(autoincrement())
+  transactionId Int
+  ticketTypeId  Int
+  quantity      Int
+  unitPriceIDR  Int 
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  ticketType    TicketType  @relation(fields: [ticketTypeId], references: [id], onDelete: Restrict)
+  @@index([transactionId])
+  @@index([ticketTypeId])
+}
+
+model PaymentProof {
+  id            Int         @id @default(autoincrement())
+  transactionId Int         @unique
+  imageUrl      String
+  uploadedAt    DateTime    @default(now())
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+}
+
+model Attendance {
+  id           Int         @id @default(autoincrement())
+  eventId      Int
+  userId       Int
+  ticketTypeId Int?
+  quantity     Int         @default(1)
+  totalPaidIDR Int 
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event        Event       @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  ticketType   TicketType? @relation(fields: [ticketTypeId], references: [id])
+  createdAt    DateTime    @default(now())
+
+  @@unique([eventId, userId, ticketTypeId])
+  @@index([eventId])
+}
+
+model PointEntry {
+  id            Int          @id @default(autoincrement())
+  userId        Int
+  transactionId Int? 
+  delta         Int 
+  source        PointsSource
+  expiresAt     DateTime? 
+  createdAt     DateTime     @default(now())
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transaction   Transaction? @relation(fields: [transactionId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([expiresAt])
+}
+
+model Review {
+  id        Int      @id @default(autoincrement())
+  eventId   Int
+  userId    Int
+  rating    Int 
+  comment   String?
+  createdAt DateTime @default(now())
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId]) 
+  @@index([eventId])
+  @@index([userId])
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  FAILED
+}
+
+enum NotificationType {
+  TRANSACTION_ACCEPTED
+  TRANSACTION_REJECTED
+}
+
+model EmailNotification {
+  id        Int                @id @default(autoincrement())
+  toUserId  Int
+  type      NotificationType
+  subject   String
+  body      String
+  status    NotificationStatus @default(PENDING)
+  sentAt    DateTime?
+  createdAt DateTime           @default(now())
+  toUser    User               @relation(fields: [toUserId], references: [id], onDelete: Cascade)
+  @@index([toUserId, status])
 }

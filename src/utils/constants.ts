@@ -1,0 +1,53 @@
+// Application Constants
+export const APP_CONSTANTS = {
+  JWT_SECRET: process.env.JWT_SECRET || 'changeme!',
+  POINTS_REFERRAL_REWARD: 10000,
+  COUPON_VALUE: 10000,
+  COUPON_EXP_DAYS: 90,
+  PAYMENT_TIMEOUT_HOURS: 2,
+  ADMIN_DECISION_DAYS: 3,
+  EMAIL_VERIFICATION_HOURS: 24,
+  PASSWORD_RESET_HOURS: 1,
+} as const;
+
+// Transaction Statuses
+export const TRANSACTION_STATUS = {
+  WAITING_PAYMENT: 'WAITING_PAYMENT',
+  WAITING_ADMIN_CONFIRMATION: 'WAITING_ADMIN_CONFIRMATION',
+  DONE: 'DONE',
+  REJECTED: 'REJECTED',
+  CANCELED: 'CANCELED',
+  EXPIRED: 'EXPIRED',
+} as const;
+
+// Event Statuses
+export const EVENT_STATUS = {
+  DRAFT: 'DRAFT',
+  PUBLISHED: 'PUBLISHED',
+  CANCELED: 'CANCELED',
+} as const;
+
+// User Roles
+export const USER_ROLES = {
+  CUSTOMER: 'CUSTOMER',
+  ORGANIZER: 'ORGANIZER',
+} as const;
+
+// Point Sources
+export const POINT_SOURCES = {
+  REFERRAL_REWARD: 'REFERRAL_REWARD',
+  PURCHASE_REDEEM: 'PURCHASE_REDEEM',
+  ROLLBACK: 'ROLLBACK',
+} as const;
+
+// Discount Types
+export const DISCOUNT_TYPES = {
+  AMOUNT: 'AMOUNT',
+  PERCENTAGE: 'PERCENTAGE',
+} as const;
+
+// Email Notification Types
+export const EMAIL_NOTIFICATION_TYPES = {
+  TRANSACTION_ACCEPTED: 'TRANSACTION_ACCEPTED',
+  TRANSACTION_REJECTED: 'TRANSACTION_REJECTED',
+} as const;

@@ -1,133 +1,120 @@
-import { NextFunction, Request, Response } from "express";
-import { PrismaClient } from "../generated/prisma";
-import { createToken, verifyToken } from "../utils/createToken";
-import { cloudinaryUpload } from "../config/cloudinary";
-import { registerService, loginService } from "../service/auth.service";
-import logger from "../utils/logger";
+import { Request, Response, NextFunction } from 'express';
+import AuthService from '../service/auth.service';
+import { prisma } from '../config/prisma';
 
-const prisma = new PrismaClient();
 
-class AuthController {
-  public async register(req: Request, res: Response, next: NextFunction) {
-    try {
-      await registerService(req.body);
-      return res.status(201).json({
-        message:
-          "User registered successfully. Please check your email to verify account.",
-      });
-    } catch (error) {
-      next(error);
+export class AuthController {
+    async register(req: Request, res: Response, next: NextFunction) {
+        try {
+            const body = req.body;
+            
+            // Enforce referral can only be used by CUSTOMER registrations
+            if (body.referralCode) {
+                if (body.role && body.role !== 'CUSTOMER') {
+                    return res.status(400).json({ 
+                        message: 'Referral codes can only be used by customers. Organizers cannot use referral codes.' 
+                    });
+                }
+                
+                // Validate that the referral code exists and belongs to a valid user
+                const referrer = await prisma.user.findUnique({ 
+                    where: { referralCode: body.referralCode },
+                    select: { id: true, name: true, role: true, email: true }
+                });
+                
+                if (!referrer) {
+                    return res.status(400).json({ 
+                        message: 'Invalid referral code. Please check and try again.' 
+                    });
+                }
+                
+                // Optional: Prevent self-referral
+                if (body.email === referrer.email) {
+                    return res.status(400).json({ 
+                        message: 'You cannot refer yourself.' 
+                    });
+                }
+            }
+            
+            const result = await AuthService.register(body);
+            res.status(201).json(result);
+        } catch (error) {
+            next(error);
+        }
     }
-  }
 
-  public async verifyEmail(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { token } = req.query;
-
-      if (!token || typeof token !== "string") {
-        return res.status(400).json({ message: "Token is required" });
-      }
-
-      const decoded: any = verifyToken(token);
-      if (!decoded || !decoded.id) {
-        return res
-          .status(400)
-          .json({ message: "Verification failed. Token invalid or expired." });
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
-      });
-
-      if (!user) {
-        return res.status(404).json({ message: "User not found" });
-      }
-
-      if (user.isVerified) {
-        return res.status(200).json({ message: "User already verified" });
-      }
-
-      await prisma.user.update({
-        where: { id: decoded.id },
-        data: { isVerified: true },
-      });
-
-      return res.status(200).json({ message: "Email verified successfully" });
-    } catch (error) {
-      next(error);
+    async login(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { email, password } = req.body;
+            const result = await AuthService.login(email, password);
+            res.status(200).json(result);
+        } catch (error) {
+            next(error);
+        }
     }
-  }
 
-  public async login(req: Request, res: Response, next: NextFunction) {
-    const { email, password } = req.body;
+    async verifyEmail(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { token } = req.body as { token: string };
+            if (!token) return res.status(400).json({ message: 'Token is required' });
+            const now = new Date();
+            const evt = await prisma.emailVerificationToken.findUnique({ where: { token } });
+            if (!evt || evt.usedAt || evt.expiresAt < now) {
+                return res.status(400).json({ message: 'Invalid or expired token' });
+            }
 
-    try {
-      logger.info(`${req.method} ${req.path}: incoming data ${JSON.stringify(req.body)}`)
-      if (typeof email !== "string" || typeof password !== "string") {
-        return res
-          .status(400)
-          .json({ error: "Email and password must be strings" });
-      }
+            await prisma.$transaction(async (tx) => {
+                await tx.user.update({ where: { id: evt.userId }, data: { isVerified: true } });
+                await tx.emailVerificationToken.update({ where: { id: evt.id }, data: { usedAt: new Date() } });
+            });
 
-      const { token, user } = await loginService(email, password);
-
-      return res.status(200).json({
-        message: "User signed in successfully",
-        token,
-        user,
-      });
-    } catch (error) {
-      next(error);
+            res.status(200).json({ message: 'Email verified' });
+        } catch (error) {
+            next(error);
+        }
     }
-  }
 
-  public async keepLogin(req: Request, res: Response, next: NextFunction) {
-    try {
-      const signInUser = await prisma.user.findUnique({
-        where: { id: parseInt(res.locals.decrypt.id) },
-      });
+    async keepLogin(req: Request, res: Response, next: NextFunction) { res.status(404).json({ message: 'Not implemented in MVP' }); }
 
-      if (!signInUser) {
-        return res.status(404).send({
-          success: false,
-          message: "Account not found",
-        });
-      }
-
-      const newToken = createToken(signInUser, "24h");
-
-      res.status(200).send({
-        success: true,
-        message: "Sign In successful",
-        user: { email: signInUser.email, token: newToken },
-      });
-    } catch (error) {
-      next(error);
+    async changePassword(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = (req as any).user.id;
+            const { oldPassword, newPassword } = req.body;
+            const result = await AuthService.changePassword(userId, oldPassword, newPassword);
+            res.status(200).json(result);
+        } catch (error) { next(error); }
     }
-  }
 
-  public async changeProfileImg(
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) {
-    try {
-      if (!req.file) {
-        throw { code: 404, message: "No Exist file" };
-      }
-      const upload = await cloudinaryUpload(req.file);
-      const update = await prisma.user.update({
-        where: { id: parseInt(res.locals.decrypt.id) },
-        data: { profile_img: upload.secure_url },
-      });
-
-      res
-        .status(200)
-        .send({ success: true, message: "Change Image profile success" });
-    } catch (error) {
-      next(error);
+    async forgotPassword(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { email } = req.body;
+            const result = await AuthService.forgotPassword(email);
+            res.status(200).json(result);
+        } catch (error) { next(error); }
     }
-  }
+    async resetPassword(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { token, newPassword } = req.body;
+            const result = await AuthService.resetPassword(token, newPassword);
+            res.status(200).json(result);
+        } catch (error) { next(error); }
+    }
+
+    async updateProfile(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = (req as any).user.id;
+            const result = await AuthService.updateProfile(userId, req.body);
+            res.status(200).json(result);
+        } catch (error) { next(error); }
+    }
+
+    async uploadProfileImage(req: Request, res: Response, next: NextFunction) {
+        try {
+            const userId = (req as any).user.id;
+            const result = await AuthService.uploadProfileImage(userId, req.body.imageUrl || (req as any).file);
+            res.status(200).json(result);
+        } catch (error) { next(error); }
+    }
 }
 
-export default AuthController;
+export default new AuthController();

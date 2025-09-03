@@ -1,55 +1,39 @@
-import dotenv from "dotenv";
-dotenv.config();
+import express, { Application, Request, Response } from "express";
 import cors from "cors";
-import express, { Application, NextFunction, Request, Response } from "express";
-import AuthRouter from "./routers/auth.router";
-import BlogRouter from "./routers/blog.router";
-import logger from "./utils/logger";
+import dotenv from "dotenv";
 
-const PORT: string = process.env.PORT || "8181";
+dotenv.config();
 
-class App {
-  public app: Application;
+import authRouter from "./routers/auth.router";
+import userRouter from "./routers/user.router";
+import eventRouter from "./routers/event.router";
+import transactionRouter from "./routers/transaction.router";
+import voucherRouter from "./routers/voucher.router";
+import couponRouter from "./routers/coupon.router";
+import reviewRouter from "./routers/review.router";
+import dashboardRouter from "./routers/dashboard.router";
+import notificationRouter from "./routers/notification.router";
+import errorHandler from "./middleware/errorHandler";
 
-  constructor() {
-    this.app = express();
-    this.configure();
-    this.route();
-    this.errorHandling();
-  }
+const app: Application = express();
 
-  private configure(): void {
-    this.app.use(cors());
-    this.app.use(express.json());
-  }
-  private route(): void {
-    this.app.get("/", (req: Request, res: Response) => {
-      res.status(200).send("<h1>Classbase API</h1>");
-    });
+app.use(cors());
+app.use(express.json());
 
-    // define route
-    const authRouter: AuthRouter = new AuthRouter();
-    const blogRouter: BlogRouter = new BlogRouter();
-    this.app.use("/auth", authRouter.getRouter());
-    this.app.use("/blog", blogRouter.getRouter());
-  }
+app.get("/", (req: Request, res: Response) => {
+  res.status(200).json({ status: "ok", message: "Event Management API is running" });
+});
 
-  private errorHandling(): void {
-    this.app.use(
-      (error: any, req: Request, res: Response, next: NextFunction) => {
-        logger.error(`${req.method} ${req.path}: ${error.message} ${JSON.stringify(error)}`
+app.use("/api/auth", authRouter);
+app.use("/api/users", userRouter);
+app.use("/api/events", eventRouter);
+app.use("/api/transactions", transactionRouter);
+app.use("/api/vouchers", voucherRouter);
+app.use("/api/coupons", couponRouter);
+app.use("/api/reviews", reviewRouter);
+app.use("/api/dashboard", dashboardRouter);
+app.use("/api/notifications", notificationRouter);
 
-        );
-        res.status(error.code || 500).send(error);
-      }
-    );
-  }
+app.use(errorHandler);
 
-  public start(): void {
-    this.app.listen(PORT, () => {
-      console.log(`API Running: http://localhost:${PORT}`);
-    });
-  }
-}
-
-export default App;
+export default app;

@@ -1,3 +1,0 @@
-2025-08-25 15:06:46 [ERROR]: GET /auth/signin: Unexpected token 'p', "ppp" is not valid JSON {"expose":true,"statusCode":400,"status":400,"body":"ppp","type":"entity.parse.failed"}
-2025-08-25 15:15:16 [ERROR]: POST /auth/signin: Invalid email or password {}
-2025-08-25 15:19:26 [ERROR]: POST /auth/signin: Invalid email or password {}

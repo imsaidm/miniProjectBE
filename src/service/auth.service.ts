@@ -1,73 +1,176 @@
-import { transport } from "../config/nodemailer";
-import bcrypt from "bcrypt";
-import { createToken } from "../utils/createToken";
-import {
-  createAccount,
-  findByEmail,
-} from "../repositories/accounts.repository";
+import { prisma } from '../config/prisma';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import { v4 as uuidv4 } from 'uuid';
+import { sendEmail } from '../config/mailer';
 
-export const registerService = async (data: {
+const JWT_SECRET = process.env.JWT_SECRET || 'changeme!';
+const POINTS_REFERRAL_REWARD = 10000;
+const COUPON_VALUE = 10000;
+const COUPON_EXP_DAYS = 90;
+
+interface RegisterDTO {
   email: string;
   password: string;
-  name: string;
-}) => {
-  const { email, password, name } = data;
+  name?: string;
+  role?: 'CUSTOMER' | 'ORGANIZER';
+  referralCode?: string;
+}
 
-  // cek user existing
-  const existingUser = await findByEmail(email);
-  if (existingUser) {
-    throw new Error("Email already registered");
+export class AuthService {
+  async register({ email, password, name, role, referralCode }: RegisterDTO) {
+    // cek email unik
+    const exists = await prisma.user.findUnique({ where: { email } });
+    if (exists) throw { status: 409, message: 'Email is already registered' };
+
+    // hash password
+    const hashedPass = await bcrypt.hash(password, 10);
+
+    // generate referral code user baru
+    const userReferralCode = (uuidv4().split('-')[0] || '').toUpperCase();
+
+
+    // payload user
+    const userPayload: any = {
+      email,
+      password: hashedPass,
+      name,
+      role: role || 'CUSTOMER',
+      referralCode: userReferralCode,
+    };
+    if (referralCode) userPayload.referredByCode = referralCode;
+
+    // simpan user baru
+    const user = await prisma.user.create({ data: userPayload });
+
+    // create email verification token
+    const emailToken = uuidv4();
+    const emailTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await prisma.emailVerificationToken.create({
+      data: { userId: user.id, token: emailToken, expiresAt: emailTokenExpiresAt }
+    });
+
+    // send verification email (or log in dev)
+    const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
+    const verifyUrl = `${frontendBaseUrl}/auth/verify?token=${encodeURIComponent(emailToken)}`;
+    const subject = 'Verify your email address';
+    const html = `
+      <p>Hi${name ? ' ' + name : ''},</p>
+      <p>Thanks for registering. Please verify your email by clicking the link below:</p>
+      <p><a href="${verifyUrl}">Verify Email</a></p>
+      <p>If you did not sign up, you can ignore this email.</p>
+    `;
+    await sendEmail({ to: email, subject, html, text: `Verify your email: ${verifyUrl}` });
+
+    // kalau ada referral → kasih reward
+    if (referralCode) {
+      const referrer = await prisma.user.findUnique({ where: { referralCode } });
+      if (referrer) {
+        const expiresAt = new Date(Date.now() + COUPON_EXP_DAYS * 24 * 60 * 60 * 1000);
+
+        await prisma.referral.create({
+          data: {
+            referrerId: referrer.id,
+            refereeId: user.id,
+          },
+        });
+
+        await prisma.pointEntry.create({
+          data: {
+            userId: referrer.id,
+            delta: POINTS_REFERRAL_REWARD,
+            source: 'REFERRAL_REWARD',
+            expiresAt,
+          },
+        });
+
+        // Update referrer's points balance
+        await prisma.user.update({
+          where: { id: referrer.id },
+          data: { 
+            pointsBalance: {
+              increment: POINTS_REFERRAL_REWARD
+            }
+          }
+        });
+
+        await prisma.coupon.create({
+          data: {
+            code: uuidv4(),
+            userId: user.id,
+            discountType: 'AMOUNT',
+            discountValue: COUPON_VALUE,
+            expiresAt,
+          },
+        });
+      }
+    }
+
+    const resp: any = { userId: user.id, role: user.role, message: 'Registration successful' };
+    if (process.env.NODE_ENV !== 'production') {
+      resp.verifyToken = emailToken;
+      resp.verifyUrl = verifyUrl;
+    }
+    return resp;
   }
 
-  // hash password
-  const hashedPassword = await bcrypt.hash(password, 10);
+  async login(email: string, password: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw { status: 401, message: 'Invalid email/password' };
 
-  // simpan user baru
-  const user = await createAccount({
-    email,
-    password: hashedPassword,
-    name,
-    isVerified: false,
-  });
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) throw { status: 401, message: 'Invalid email/password' };
 
-  // generate token
-  const token = createToken({ id: user.id }, "1h");
+    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
 
-  // link ke FE
-  const link = `http://localhost:3000/verify?token=${token}`;
-
-  // kirim email
-  await transport.sendMail({
-    to: email,
-    subject: "Verify your account",
-    html: `<a href="${link}" target="_blank"><div>Click here to verify</div></a>`,
-  });
-
-  return user;
-};
-
-export const loginService = async (email: string, password: string) => {
-  // cari user
-  const user = await findByEmail(email);
-  if (!user) {
-    throw new Error("Invalid email or password");
+    return {
+      token,
+      user: { id: user.id, email: user.email, name: user.name, role: user.role }
+    };
   }
 
-  // cek password
-  const isPasswordValid = await bcrypt.compare(password, user.password);
-  if (!isPasswordValid) {
-    throw new Error("Invalid email or password");
+  async changePassword(userId: number, oldPass: string, newPass: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) throw { status: 404, message: 'User not found' };
+    const valid = await bcrypt.compare(oldPass, user.password);
+    if (!valid) throw { status: 400, message: 'Old password incorrect' };
+    const hashed = await bcrypt.hash(newPass, 10);
+    await prisma.user.update({ where: { id: userId }, data: { password: hashed } });
+    return { message: 'Password updated' };
   }
 
-  // bikin token (24 jam)
-  const token = createToken({ id: user.id }, "24h");
+  async forgotPassword(email: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) return { message: 'If the email exists, a reset link will be sent' };
+    const token = uuidv4();
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    await prisma.passwordResetToken.create({ data: { userId: user.id, token, expiresAt } });
+    return { message: 'Reset token created', token };
+  }
 
-  return {
-    token,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-    },
-  };
-};
+  async resetPassword(token: string, newPass: string) {
+    const prt = await prisma.passwordResetToken.findUnique({ where: { token } });
+    if (!prt || prt.usedAt || prt.expiresAt < new Date()) throw { status: 400, message: 'Invalid or expired token' };
+    const hashed = await bcrypt.hash(newPass, 10);
+    await prisma.$transaction(async (tx) => {
+      await tx.user.update({ where: { id: prt.userId }, data: { password: hashed } });
+      await tx.passwordResetToken.update({ where: { id: prt.id }, data: { usedAt: new Date() } });
+    });
+    return { message: 'Password has been reset' };
+  }
+
+  async updateProfile(userId: number, data: any) {
+    const { name } = data;
+    const user = await prisma.user.update({ where: { id: userId }, data: { name } });
+    return { id: user.id, email: user.email, name: user.name, profileImg: user.profileImg, role: user.role };
+  }
+
+  async uploadProfileImage(userId: number, image: any) {
+    const imageUrl = typeof image === 'string' ? image : image?.secure_url;
+    if (!imageUrl) throw { status: 400, message: 'Image is required' };
+    const user = await prisma.user.update({ where: { id: userId }, data: { profileImg: imageUrl } });
+    return { id: user.id, profileImg: user.profileImg };
+  }
+}
+
+export default new AuthService();

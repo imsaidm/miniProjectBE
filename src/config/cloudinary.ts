@@ -1,25 +1,40 @@
-import { v2 as cloudinary, UploadApiResponse } from "cloudinary";
-import * as streamifier from "streamifier";
+import { v2 as cloudinary } from 'cloudinary';
+import streamifier from 'streamifier';
+
+// Configure Cloudinary
+const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+const apiKey = process.env.CLOUDINARY_API_KEY;
+const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
 cloudinary.config({
-  api_key: "331288569242839",
-  api_secret: "0LLOBjRjjmBPWYbaECxd_dP5O34",
-  cloud_name: "dluqjnhcm",
+  cloud_name: cloudName || '',
+  api_key: apiKey || '',
+  api_secret: apiSecret || '',
 });
 
-export const cloudinaryUpload = (
-  file: Express.Multer.File
-): Promise<UploadApiResponse> => {
+// Function to upload image buffer to Cloudinary
+export const uploadImageBuffer = (buffer: Buffer, folder: string = 'payment-proofs'): Promise<string> => {
   return new Promise((resolve, reject) => {
     const uploadStream = cloudinary.uploader.upload_stream(
-      (err, result: UploadApiResponse) => {
-        if (err) {
-          reject(err);
+      {
+        folder: folder,
+        resource_type: 'image',
+        transformation: [
+          { width: 800, height: 600, crop: 'limit' },
+          { quality: 'auto' }
+        ]
+      },
+      (error, result) => {
+        if (error) {
+          reject(error);
         } else {
-          resolve(result);
+          resolve(result!.secure_url);
         }
       }
     );
-    streamifier.createReadStream(file.buffer).pipe(uploadStream);
+
+    streamifier.createReadStream(buffer).pipe(uploadStream);
   });
 };
+
+export default cloudinary;
