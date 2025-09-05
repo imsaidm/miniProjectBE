@@ -1,22 +1,30 @@
 import { PrismaClient } from '../generated/prisma';
 
-// Configure DATABASE_URL with connection pool parameters
+// Configure DATABASE_URL with optimized connection pool parameters
 const databaseUrl = process.env.DATABASE_URL;
 const directUrl = process.env.DIRECT_URL;
 
-// Add connection pool parameters to DATABASE_URL if not already present
+// Add optimized connection pool parameters to DATABASE_URL
 const urlWithPoolConfig = databaseUrl?.includes('?') 
-  ? `${databaseUrl}&connection_limit=20&pool_timeout=20&connect_timeout=60`
-  : `${databaseUrl}?connection_limit=20&pool_timeout=20&connect_timeout=60`;
+  ? `${databaseUrl}&connection_limit=10&pool_timeout=30&connect_timeout=60&socket_timeout=30&statement_timeout=30000`
+  : `${databaseUrl}?connection_limit=10&pool_timeout=30&connect_timeout=60&socket_timeout=30&statement_timeout=30000`;
 
-export const prisma = new PrismaClient({
-  log: ['query', 'info', 'warn', 'error'],
-  datasources: {
-    db: {
-      url: urlWithPoolConfig,
-    },
-  },
-});
+// Create a singleton Prisma client instance
+let prismaInstance: PrismaClient | null = null;
+
+export const prisma = (() => {
+  if (!prismaInstance) {
+    prismaInstance = new PrismaClient({
+      log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['warn', 'error'],
+      datasources: {
+        db: {
+          url: urlWithPoolConfig,
+        },
+      },
+    });
+  }
+  return prismaInstance;
+})();
 
 // Connection retry wrapper
 export const withRetry = async <T>(
@@ -50,19 +58,54 @@ export const withRetry = async <T>(
   throw lastError!;
 };
 
+// Connection health check
+export const checkConnection = async (): Promise<boolean> => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    return true;
+  } catch (error) {
+    console.error('Database connection check failed:', error);
+    return false;
+  }
+};
+
+// Graceful shutdown with proper cleanup
+const gracefulShutdown = async (signal: string) => {
+  console.log(`Received ${signal}, shutting down gracefully...`);
+  
+  try {
+    // Wait for ongoing operations to complete
+    await prisma.$disconnect();
+    console.log('Database connection closed successfully');
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+  } finally {
+    process.exit(0);
+  }
+};
+
 // Handle graceful shutdown
 process.on('beforeExit', async () => {
-  await prisma.$disconnect();
+  await gracefulShutdown('beforeExit');
 });
 
-process.on('SIGINT', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
+process.on('SIGINT', () => {
+  gracefulShutdown('SIGINT');
 });
 
-process.on('SIGTERM', async () => {
-  await prisma.$disconnect();
-  process.exit(0);
+process.on('SIGTERM', () => {
+  gracefulShutdown('SIGTERM');
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', async (error) => {
+  console.error('Uncaught Exception:', error);
+  await gracefulShutdown('uncaughtException');
+});
+
+process.on('unhandledRejection', async (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  await gracefulShutdown('unhandledRejection');
 });
 
 export default prisma;

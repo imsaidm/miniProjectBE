@@ -13,6 +13,7 @@ import couponRouter from "./routers/coupon.router";
 import reviewRouter from "./routers/review.router";
 import dashboardRouter from "./routers/dashboard.router";
 import notificationRouter from "./routers/notification.router";
+import healthRouter from "./routers/health.router";
 import errorHandler from "./middleware/errorHandler";
 
 const app: Application = express();
@@ -33,6 +34,7 @@ app.use("/api/coupons", couponRouter);
 app.use("/api/reviews", reviewRouter);
 app.use("/api/dashboard", dashboardRouter);
 app.use("/api/notifications", notificationRouter);
+app.use("/api", healthRouter);
 
 app.use(errorHandler);
 
