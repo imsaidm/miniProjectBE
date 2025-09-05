@@ -1,4 +1,4 @@
-import { prisma } from '../config/prisma';
+import { prisma, withRetry } from '../config/prisma';
 
 export class EventService {
   async createEvent(organizerId: number, data: any) {
@@ -110,10 +110,12 @@ export class EventService {
     // Calculate organizer ratings for each event
     const eventsWithRatings = await Promise.all(
       events.map(async (event) => {
-        const organizerReviews = await prisma.review.findMany({
-          where: { event: { organizerId: event.organizerId } },
-          select: { rating: true }
-        });
+        const organizerReviews = await withRetry(() => 
+          prisma.review.findMany({
+            where: { event: { organizerId: event.organizerId } },
+            select: { rating: true }
+          })
+        );
 
         const organizerRating = organizerReviews.length > 0 
           ? organizerReviews.reduce((sum, review) => sum + review.rating, 0) / organizerReviews.length 
@@ -159,10 +161,12 @@ export class EventService {
     }
 
     // Calculate organizer rating
-    const organizerReviews = await prisma.review.findMany({
-      where: { event: { organizerId: event.organizerId } },
-      select: { rating: true }
-    });
+    const organizerReviews = await withRetry(() => 
+      prisma.review.findMany({
+        where: { event: { organizerId: event.organizerId } },
+        select: { rating: true }
+      })
+    );
 
     const organizerRating = organizerReviews.length > 0 
       ? organizerReviews.reduce((sum, review) => sum + review.rating, 0) / organizerReviews.length 

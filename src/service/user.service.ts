@@ -1,4 +1,4 @@
-import { prisma } from '../config/prisma';
+import { prisma, withRetry } from '../config/prisma';
 
 export class UserService {
   async getProfile(userId: number) {
@@ -56,10 +56,12 @@ export class UserService {
     let organizerReviewCount = 0;
     
     if (user.role === 'ORGANIZER') {
-      const organizerReviews = await prisma.review.findMany({
-        where: { event: { organizerId: userId } },
-        select: { rating: true }
-      });
+      const organizerReviews = await withRetry(() => 
+        prisma.review.findMany({
+          where: { event: { organizerId: userId } },
+          select: { rating: true }
+        })
+      );
       
       organizerRating = organizerReviews.length > 0 
         ? organizerReviews.reduce((sum, review) => sum + review.rating, 0) / organizerReviews.length 
