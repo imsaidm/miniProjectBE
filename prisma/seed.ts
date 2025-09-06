@@ -19,8 +19,35 @@ const getRandomItem = <T>(array: T[]): T => {
   return array[Math.floor(Math.random() * array.length)]!;
 };
 
+// Valid image URLs for users and events
+const userImages = [
+  'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?w=400&h=400&fit=crop&crop=face',
+  'https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=400&h=400&fit=crop&crop=face'
+];
+
+const eventImages = [
+  'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1501281668745-f7f57925c3b4?w=800&h=400&fit=crop',
+  'https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800&h=400&fit=crop'
+];
+
 async function main() {
-  console.log('🌱 Starting comprehensive database seeding...');
+  console.log('🌱 Starting database seeding with reduced data...');
 
   // Clear existing data in correct order (respecting foreign key constraints)
   await prisma.emailNotification.deleteMany();
@@ -41,9 +68,9 @@ async function main() {
 
   console.log('🧹 Cleared existing data');
 
-  // Create 20 Organizers
+  // Create 5 Organizers
   const organizers = [];
-  for (let i = 1; i <= 20; i++) {
+  for (let i = 1; i <= 5; i++) {
     const organizer = await prisma.user.create({
       data: {
         email: `organizer${i}@example.com`,
@@ -53,15 +80,15 @@ async function main() {
         isVerified: true,
         referralCode: `ORG${i.toString().padStart(3, '0')}`,
         pointsBalance: getRandomNumber(5000, 20000),
-        profileImg: `https://images.unsplash.com/photo-${1507003211169 + i}?w=400&h=400&fit=crop&crop=face`
+        profileImg: userImages[i - 1] || null
       }
     });
     organizers.push(organizer);
   }
 
-  // Create 50 Customers
+  // Create 5 Customers
   const customers = [];
-  for (let i = 1; i <= 50; i++) {
+  for (let i = 1; i <= 5; i++) {
     const customer = await prisma.user.create({
       data: {
         email: `customer${i}@example.com`,
@@ -71,30 +98,30 @@ async function main() {
         isVerified: true,
         referralCode: `CUST${i.toString().padStart(3, '0')}`,
         pointsBalance: getRandomNumber(0, 10000),
-        profileImg: `https://images.unsplash.com/photo-${1500648767791 + i}?w=400&h=400&fit=crop&crop=face`
+        profileImg: userImages[i + 4] || null // Use different images for customers
       }
     });
     customers.push(customer);
   }
 
-  console.log('👥 Created 70 users (20 Organizers, 50 Customers)');
+  console.log('👥 Created 10 users (5 Organizers, 5 Customers)');
 
   // Create referral relationships
   const referrals = [];
   const usedReferees = new Set<number>();
   
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 3; i++) {
     const referrer = getRandomItem(organizers);
     let referee = getRandomItem(customers);
     
     // Find a customer who hasn't been referred yet
     let attempts = 0;
-    while (usedReferees.has(referee.id) && attempts < 50) {
+    while (usedReferees.has(referee.id) && attempts < 10) {
       referee = getRandomItem(customers);
       attempts++;
     }
     
-    if (attempts >= 50) break; // No more unreferred customers
+    if (attempts >= 10) break; // No more unreferred customers
     
     usedReferees.add(referee.id);
     
@@ -126,21 +153,21 @@ async function main() {
     await prisma.user.update({
       where: { id: referrer.id },
       data: { 
-                  pointsBalance: {
-            increment: 5000
-          }
+        pointsBalance: {
+          increment: 5000
+        }
       }
     });
   }
 
   console.log('🎁 Created referral relationships and rewards');
 
-  // Create 100 Events across different categories
+  // Create 15 Events across different categories
   const eventCategories = [EventCategory.TECH, EventCategory.MUSIC, EventCategory.BUSINESS, EventCategory.EDUCATION, EventCategory.SPORTS, EventCategory.ART, EventCategory.COMMUNITY, EventCategory.OTHER];
   const eventStatuses = [EventStatus.PUBLISHED, EventStatus.DRAFT, EventStatus.CANCELED];
   const events = [];
 
-  for (let i = 1; i <= 100; i++) {
+  for (let i = 1; i <= 15; i++) {
     const organizer = getRandomItem(organizers);
     const category = getRandomItem(eventCategories);
     const status = getRandomItem(eventStatuses);
@@ -155,7 +182,7 @@ async function main() {
         location: `Location ${i}`,
         category: category,
         status: status,
-        bannerImage: `https://images.unsplash.com/photo-${1540575467063 + i}?w=800&h=400&fit=crop`,
+        bannerImage: eventImages[i - 1] || null,
         startAt: startDate,
         endAt: endDate,
         basePriceIDR: getRandomNumber(100000, 500000),
@@ -166,17 +193,17 @@ async function main() {
     events.push(event);
   }
 
-  console.log('🎪 Created 100 events across different categories');
+  console.log('🎪 Created 15 events across different categories');
 
   // Create ticket types for each event
   const ticketTypes = [];
   for (const event of events) {
-    const numTicketTypes = getRandomNumber(1, 4);
+    const numTicketTypes = getRandomNumber(1, 3);
     for (let i = 0; i < numTicketTypes; i++) {
       const ticketType = await prisma.ticketType.create({
         data: {
           eventId: event.id,
-          name: ['Early Bird', 'Regular', 'VIP', 'Premium'][i] || `Ticket Type ${i + 1}`,
+          name: ['Early Bird', 'Regular', 'VIP'][i] || `Ticket Type ${i + 1}`,
           priceIDR: (event.basePriceIDR || 0) + (i * 100000),
           totalSeats: Math.floor((event.totalSeats || 0) / numTicketTypes),
           availableSeats: Math.floor((event.availableSeats || 0) / numTicketTypes)
@@ -190,7 +217,7 @@ async function main() {
 
   // Create vouchers for events
   const vouchers = [];
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 10; i++) {
     const event = getRandomItem(events);
     const organizer = organizers.find(o => o.id === event.organizerId);
     if (!organizer) continue;
@@ -212,11 +239,11 @@ async function main() {
     vouchers.push(voucher);
   }
 
-  console.log('🎟️ Created 50 vouchers');
+  console.log('🎟️ Created 10 vouchers');
 
   // Create coupons for customers
   const coupons = [];
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 15; i++) {
     const customer = getRandomItem(customers);
     const coupon = await prisma.coupon.create({
       data: {
@@ -232,14 +259,14 @@ async function main() {
     coupons.push(coupon);
   }
 
-  console.log('🎁 Created 100 coupons');
+  console.log('🎁 Created 15 coupons');
 
-  // Create 200 transactions with various statuses
+  // Create 30 transactions with various statuses
   const transactionStatuses = [TransactionStatus.WAITING_PAYMENT, TransactionStatus.WAITING_ADMIN_CONFIRMATION, TransactionStatus.DONE, TransactionStatus.REJECTED, TransactionStatus.EXPIRED, TransactionStatus.CANCELED];
   const transactions = [];
   const usedCoupons = new Set<number>();
 
-  for (let i = 1; i <= 200; i++) {
+  for (let i = 1; i <= 30; i++) {
     const customer = getRandomItem(customers);
     const event = getRandomItem(events);
     const status = getRandomItem(transactionStatuses);
@@ -320,7 +347,7 @@ async function main() {
       await prisma.paymentProof.create({
         data: {
           transactionId: transaction.id,
-          imageUrl: `https://images.unsplash.com/photo-${1563013544 + i}?w=400&h=400&fit=crop`
+          imageUrl: 'https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400&h=400&fit=crop'
         }
       });
     }
@@ -396,11 +423,11 @@ async function main() {
     }
   }
 
-  console.log('💰 Created 200 transactions with various statuses');
+  console.log('💰 Created 30 transactions with various statuses');
 
   // Create reviews for completed events
   const reviews = [];
-  for (let i = 0; i < 150; i++) {
+  for (let i = 0; i < 20; i++) {
     const customer = getRandomItem(customers);
     const event = getRandomItem(events);
     
@@ -425,11 +452,11 @@ async function main() {
     }
   }
 
-  console.log('⭐ Created 150 reviews');
+  console.log('⭐ Created 20 reviews');
 
   // Create email notifications for various events
   const notifications = [];
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < 15; i++) {
     const customer = getRandomItem(customers);
     const event = getRandomItem(events);
     const notification = await prisma.emailNotification.create({
@@ -444,10 +471,10 @@ async function main() {
     notifications.push(notification);
   }
 
-  console.log('📧 Created 100 email notifications');
+  console.log('📧 Created 15 email notifications');
 
   // Create additional point entries for various activities
-  for (let i = 0; i < 200; i++) {
+  for (let i = 0; i < 25; i++) {
     const customer = getRandomItem(customers);
     const sources = [PointsSource.REFERRAL_REWARD, PointsSource.PURCHASE_REDEEM, PointsSource.ROLLBACK, PointsSource.ADMIN_ADJUSTMENT];
     const source = getRandomItem(sources);
@@ -488,24 +515,24 @@ async function main() {
     });
   }
 
-  console.log('🎯 Created 200 additional point entries');
+  console.log('🎯 Created 25 additional point entries');
 
-  console.log('✅ Comprehensive database seeding completed successfully!');
+  console.log('✅ Database seeding completed successfully!');
   console.log('\n📊 Data Summary:');
-  console.log(`👥 Users: 70 (20 Organizers, 50 Customers)`);
-  console.log(`🎪 Events: 100 (Across 8 categories)`);
+  console.log(`👥 Users: 10 (5 Organizers, 5 Customers)`);
+  console.log(`🎪 Events: 15 (Across 8 categories)`);
   console.log(`🎫 Ticket Types: ${ticketTypes.length} (Multiple tiers per event)`);
-  console.log(`💰 Transactions: 200 (All statuses: WAITING_PAYMENT, WAITING_ADMIN_CONFIRMATION, DONE, REJECTED, EXPIRED, CANCELED)`);
-  console.log(`⭐ Reviews: 150 (For attended events)`);
-  console.log(`🎟️ Vouchers: 50 (Percentage and amount discounts)`);
-  console.log(`🎁 Coupons: 100 (Customer-specific rewards)`);
-  console.log(`🎯 Point Entries: 200+ (Various activities)`);
-  console.log(`📧 Email Notifications: 100 (Various types)`);
+  console.log(`💰 Transactions: 30 (All statuses: WAITING_PAYMENT, WAITING_ADMIN_CONFIRMATION, DONE, REJECTED, EXPIRED, CANCELED)`);
+  console.log(`⭐ Reviews: 20 (For attended events)`);
+  console.log(`🎟️ Vouchers: 10 (Percentage and amount discounts)`);
+  console.log(`🎁 Coupons: 15 (Customer-specific rewards)`);
+  console.log(`🎯 Point Entries: 25+ (Various activities)`);
+  console.log(`📧 Email Notifications: 15 (Various types)`);
   console.log(`🎁 Referral Relationships: ${referrals.length}`);
   
   console.log('\n🔑 Test Accounts (all use password: password123):');
-  console.log('Organizers: organizer1@example.com to organizer20@example.com');
-  console.log('Customers: customer1@example.com to customer50@example.com');
+  console.log('Organizers: organizer1@example.com to organizer5@example.com');
+  console.log('Customers: customer1@example.com to customer5@example.com');
   
   console.log('\n🎟️ Sample Voucher Codes:');
   console.log('VOUCHER001, VOUCHER002, VOUCHER003, etc.');
@@ -514,12 +541,12 @@ async function main() {
   console.log('COUPON001, COUPON002, COUPON003, etc.');
   
   console.log('\n📈 Transaction Status Distribution:');
-  console.log('- WAITING_PAYMENT: ~33 transactions');
-  console.log('- WAITING_ADMIN_CONFIRMATION: ~33 transactions');
-  console.log('- DONE: ~33 transactions');
-  console.log('- REJECTED: ~33 transactions');
-  console.log('- EXPIRED: ~33 transactions');
-  console.log('- CANCELED: ~33 transactions');
+  console.log('- WAITING_PAYMENT: ~5 transactions');
+  console.log('- WAITING_ADMIN_CONFIRMATION: ~5 transactions');
+  console.log('- DONE: ~5 transactions');
+  console.log('- REJECTED: ~5 transactions');
+  console.log('- EXPIRED: ~5 transactions');
+  console.log('- CANCELED: ~5 transactions');
 }
 
 main()

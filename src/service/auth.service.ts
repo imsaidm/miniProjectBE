@@ -106,7 +106,12 @@ export class AuthService {
       }
     }
 
-    const resp: any = { userId: user.id, role: user.role, message: 'Registration successful' };
+    const resp: any = { 
+      userId: user.id, 
+      user: { id: user.id, email: user.email, name: user.name, role: user.role },
+      role: user.role, 
+      message: 'Registration successful' 
+    };
     if (process.env.NODE_ENV !== 'production') {
       resp.verifyToken = emailToken;
       resp.verifyUrl = verifyUrl;
