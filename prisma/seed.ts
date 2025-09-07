@@ -68,14 +68,17 @@ async function main() {
 
   console.log('🧹 Cleared existing data');
 
-  // Create 5 Organizers
+  // Create 5 Organizers with realistic names
+  const organizerNames = [
+    "Sarah Johnson", "Michael Chen", "Emily Rodriguez", "David Kim", "Lisa Thompson"
+  ];
   const organizers = [];
   for (let i = 1; i <= 5; i++) {
     const organizer = await prisma.user.create({
       data: {
         email: `organizer${i}@example.com`,
         password: await bcrypt.hash('password123', 10),
-        name: `Organizer ${i}`,
+        name: organizerNames[i - 1] || `Organizer ${i}`,
         role: 'ORGANIZER',
         isVerified: true,
         referralCode: `ORG${i.toString().padStart(3, '0')}`,
@@ -86,14 +89,17 @@ async function main() {
     organizers.push(organizer);
   }
 
-  // Create 5 Customers
+  // Create 5 Customers with realistic names
+  const customerNames = [
+    "John Smith", "Maria Garcia", "Ahmed Hassan", "Jennifer Lee", "Robert Wilson"
+  ];
   const customers = [];
   for (let i = 1; i <= 5; i++) {
     const customer = await prisma.user.create({
       data: {
         email: `customer${i}@example.com`,
         password: await bcrypt.hash('password123', 10),
-        name: `Customer ${i}`,
+        name: customerNames[i - 1] || `Customer ${i}`,
         role: 'CUSTOMER',
         isVerified: true,
         referralCode: `CUST${i.toString().padStart(3, '0')}`,
@@ -162,9 +168,38 @@ async function main() {
 
   console.log('🎁 Created referral relationships and rewards');
 
-  // Create 15 Events across different categories
+  // Create 15 Events across different categories with more realistic data
   const eventCategories = [EventCategory.TECH, EventCategory.MUSIC, EventCategory.BUSINESS, EventCategory.EDUCATION, EventCategory.SPORTS, EventCategory.ART, EventCategory.COMMUNITY, EventCategory.OTHER];
   const eventStatuses = [EventStatus.PUBLISHED, EventStatus.DRAFT, EventStatus.CANCELED];
+  const eventTitles = [
+    "Tech Conference 2024", "Music Festival Summer", "Business Networking Event", "Educational Workshop Series",
+    "Sports Championship", "Art Exhibition Opening", "Community Meetup", "Startup Pitch Competition",
+    "Web Development Bootcamp", "Jazz Night Performance", "Marketing Masterclass", "Fitness Challenge",
+    "Photography Workshop", "Local Business Fair", "Innovation Summit"
+  ];
+  const eventDescriptions = [
+    "Join industry leaders and innovators for a day of cutting-edge technology discussions, networking, and hands-on workshops.",
+    "Experience an unforgettable evening of live music featuring local and international artists in a beautiful outdoor setting.",
+    "Connect with fellow professionals, entrepreneurs, and business leaders in this exclusive networking event.",
+    "Learn new skills and expand your knowledge with our comprehensive educational workshop series.",
+    "Witness the ultimate sports competition featuring top athletes and exciting matches.",
+    "Explore contemporary art from emerging and established artists in this stunning exhibition.",
+    "Meet like-minded individuals in your community and build lasting connections.",
+    "Watch innovative startups pitch their ideas to investors and industry experts.",
+    "Intensive hands-on training in modern web development technologies and best practices.",
+    "Relax and enjoy an evening of smooth jazz music in an intimate setting.",
+    "Master the art of digital marketing with expert-led sessions and practical exercises.",
+    "Challenge yourself with our fitness program designed for all skill levels.",
+    "Capture beautiful moments and improve your photography skills with professional guidance.",
+    "Discover local businesses, products, and services in this community marketplace.",
+    "Explore the latest trends and innovations shaping the future of technology and business."
+  ];
+  const locations = [
+    "Jakarta Convention Center", "Bali International Convention Center", "Surabaya City Hall", "Bandung Creative Hub",
+    "Yogyakarta Cultural Center", "Medan Business District", "Semarang Exhibition Center", "Makassar Convention Hall",
+    "Palembang Sports Complex", "Denpasar Art Gallery", "Balikpapan Tech Hub", "Manado Cultural Center",
+    "Pontianak Business Center", "Samarinda Convention Center", "Jayapura Community Hall"
+  ];
   const events = [];
 
   for (let i = 1; i <= 15; i++) {
@@ -177,9 +212,9 @@ async function main() {
     const event = await prisma.event.create({
       data: {
         organizerId: organizer.id,
-        title: `${category} Event ${i}`,
-        description: `Join us for an amazing ${category.toLowerCase()} event! This is event number ${i} with exciting activities and networking opportunities.`,
-        location: `Location ${i}`,
+        title: eventTitles[i - 1] || `${category} Event ${i}`,
+        description: eventDescriptions[i - 1] || `Join us for an amazing ${category.toLowerCase()} event! This is event number ${i} with exciting activities and networking opportunities.`,
+        location: locations[i - 1] || `Location ${i}`,
         category: category,
         status: status,
         bannerImage: eventImages[i - 1] || null,
@@ -215,24 +250,34 @@ async function main() {
 
   console.log('🎫 Created ticket types for all events');
 
-  // Create vouchers for events
+  // Create vouchers for events with better distribution
   const vouchers = [];
+  const voucherCodes = [
+    "EARLYBIRD20", "SUMMER15", "TECH10", "MUSIC25", "BUSINESS30",
+    "EDU20", "SPORTS15", "ART10", "COMMUNITY25", "SPECIAL50"
+  ];
+  
   for (let i = 0; i < 10; i++) {
     const event = getRandomItem(events);
     const organizer = organizers.find(o => o.id === event.organizerId);
     if (!organizer) continue;
 
+    const discountType = getRandomItem([DiscountType.PERCENT, DiscountType.AMOUNT]);
+    const discountValue = discountType === DiscountType.PERCENT ? getRandomNumber(10, 50) : getRandomNumber(25000, 100000);
+    const maxUses = getRandomNumber(10, 100);
+    const usedCount = getRandomNumber(0, Math.min(maxUses, 50));
+
     const voucher = await prisma.voucher.create({
       data: {
-        code: `VOUCHER${i.toString().padStart(3, '0')}`,
+        code: voucherCodes[i] || `VOUCHER${i.toString().padStart(3, '0')}`,
         eventId: event.id,
         organizerId: organizer.id,
-        discountType: getRandomItem([DiscountType.PERCENT, DiscountType.AMOUNT]),
-        discountValue: getRandomItem([DiscountType.PERCENT, DiscountType.AMOUNT]) === DiscountType.PERCENT ? getRandomNumber(10, 50) : getRandomNumber(25000, 100000),
+        discountType: discountType,
+        discountValue: discountValue,
         startsAt: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
         endsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
-        maxUses: getRandomNumber(10, 100),
-        usedCount: getRandomNumber(0, 50),
+        maxUses: maxUses,
+        usedCount: usedCount,
         isActive: Math.random() > 0.2 // 80% active
       }
     });
@@ -241,19 +286,29 @@ async function main() {
 
   console.log('🎟️ Created 10 vouchers');
 
-  // Create coupons for customers
+  // Create coupons for customers with better distribution
   const coupons = [];
+  const couponCodes = [
+    "WELCOME10", "FIRST15", "LOYAL20", "VIP25", "SPECIAL30",
+    "NEWUSER5", "RETURN10", "PREMIUM20", "GOLD15", "SILVER10",
+    "BRONZE5", "PLATINUM25", "DIAMOND30", "ELITE20", "MASTER15"
+  ];
+  
   for (let i = 0; i < 15; i++) {
     const customer = getRandomItem(customers);
+    const discountType = getRandomItem([DiscountType.PERCENT, DiscountType.AMOUNT]);
+    const discountValue = discountType === DiscountType.PERCENT ? getRandomNumber(5, 25) : getRandomNumber(10000, 50000);
+    const isUsed = Math.random() > 0.7; // 30% used
+
     const coupon = await prisma.coupon.create({
       data: {
-        code: `COUPON${i.toString().padStart(3, '0')}`,
+        code: couponCodes[i] || `COUPON${i.toString().padStart(3, '0')}`,
         userId: customer.id,
-        discountType: getRandomItem([DiscountType.PERCENT, DiscountType.AMOUNT]),
-        discountValue: getRandomItem([DiscountType.PERCENT, DiscountType.AMOUNT]) === DiscountType.PERCENT ? getRandomNumber(5, 25) : getRandomNumber(10000, 50000),
+        discountType: discountType,
+        discountValue: discountValue,
         expiresAt: new Date(Date.now() + getRandomNumber(30, 90) * 24 * 60 * 60 * 1000),
-        isUsed: Math.random() > 0.7, // 30% used
-        usedAt: Math.random() > 0.7 ? new Date() : null
+        isUsed: isUsed,
+        usedAt: isUsed ? new Date() : null
       }
     });
     coupons.push(coupon);
@@ -261,8 +316,15 @@ async function main() {
 
   console.log('🎁 Created 15 coupons');
 
-  // Create 30 transactions with various statuses
-  const transactionStatuses = [TransactionStatus.WAITING_PAYMENT, TransactionStatus.WAITING_ADMIN_CONFIRMATION, TransactionStatus.DONE, TransactionStatus.REJECTED, TransactionStatus.EXPIRED, TransactionStatus.CANCELED];
+  // Create 30 transactions with various statuses and better distribution
+  const transactionStatuses = [
+    TransactionStatus.WAITING_PAYMENT, TransactionStatus.WAITING_PAYMENT, TransactionStatus.WAITING_PAYMENT, // 3 waiting payment
+    TransactionStatus.WAITING_ADMIN_CONFIRMATION, TransactionStatus.WAITING_ADMIN_CONFIRMATION, TransactionStatus.WAITING_ADMIN_CONFIRMATION, // 3 waiting confirmation
+    TransactionStatus.DONE, TransactionStatus.DONE, TransactionStatus.DONE, TransactionStatus.DONE, TransactionStatus.DONE, // 5 completed
+    TransactionStatus.REJECTED, TransactionStatus.REJECTED, // 2 rejected
+    TransactionStatus.EXPIRED, TransactionStatus.EXPIRED, // 2 expired
+    TransactionStatus.CANCELED, TransactionStatus.CANCELED // 2 canceled
+  ];
   const transactions = [];
   const usedCoupons = new Set<number>();
 
@@ -376,15 +438,26 @@ async function main() {
 
     // Create attendance records for completed transactions
     if (status === TransactionStatus.DONE) {
-      await prisma.attendance.create({
-        data: {
+      // Check if attendance record already exists
+      const existingAttendance = await prisma.attendance.findFirst({
+        where: {
           eventId: event.id,
           userId: customer.id,
-          ticketTypeId: ticketType.id,
-          quantity: quantity,
-          totalPaidIDR: totalPayable
+          ticketTypeId: ticketType.id
         }
       });
+
+      if (!existingAttendance) {
+        await prisma.attendance.create({
+          data: {
+            eventId: event.id,
+            userId: customer.id,
+            ticketTypeId: ticketType.id,
+            quantity: quantity,
+            totalPaidIDR: totalPayable
+          }
+        });
+      }
     }
 
     // Update ticket type available seats
@@ -427,44 +500,100 @@ async function main() {
 
   // Create reviews for completed events
   const reviews = [];
-  for (let i = 0; i < 20; i++) {
-    const customer = getRandomItem(customers);
-    const event = getRandomItem(events);
+  const reviewComments = [
+    "Amazing event! The speakers were fantastic and the content was very valuable.",
+    "Great networking opportunity. Met some interesting people and learned a lot.",
+    "Well organized event with excellent facilities. Would definitely attend again.",
+    "The event exceeded my expectations. The presentations were engaging and informative.",
+    "Good event overall, though the venue could have been better. Content was solid.",
+    "Outstanding experience! The organizers did a fantastic job with everything.",
+    "Really enjoyed this event. The speakers were knowledgeable and engaging.",
+    "Great value for money. The event was well-structured and informative.",
+    "Excellent event with high-quality content. Highly recommended to others.",
+    "Good event but could use some improvements in the scheduling.",
+    "Fantastic experience! The networking opportunities were particularly valuable.",
+    "Well-executed event with great speakers and interesting topics.",
+    "The event was okay, but the venue was a bit cramped for the number of attendees.",
+    "Outstanding organization and content. One of the best events I've attended.",
+    "Great event with excellent speakers. The Q&A session was particularly good.",
+    "Good event overall, though the timing could have been better.",
+    "Excellent content and presentation. The event was very well organized.",
+    "Really enjoyed the event. The speakers were engaging and the topics were relevant.",
+    "Great networking event with valuable insights. Would attend again.",
+    "The event was well-organized and the content was very informative."
+  ];
+
+  // Get all completed transactions to create reviews
+  const completedTransactions = await prisma.transaction.findMany({
+    where: { status: TransactionStatus.DONE },
+    include: { event: true, user: true }
+  });
+
+  for (let i = 0; i < Math.min(completedTransactions.length, 25); i++) {
+    const transaction = completedTransactions[i];
+    if (!transaction) continue;
     
-    // Check if customer attended this event
-    const attendance = await prisma.attendance.findFirst({
+    const comment = getRandomItem(reviewComments);
+    const rating = getRandomNumber(3, 5); // Mostly positive ratings (3-5)
+    
+    // Only create review if one doesn't exist
+    const existingReview = await prisma.review.findFirst({
       where: {
-        userId: customer.id,
-        eventId: event.id
+        eventId: transaction.eventId,
+        userId: transaction.userId
       }
     });
 
-    if (attendance) {
+    if (!existingReview) {
       const review = await prisma.review.create({
         data: {
-          eventId: event.id,
-          userId: customer.id,
-          rating: getRandomNumber(1, 5),
-          comment: `Great event! I really enjoyed the ${event.category.toLowerCase()} experience. Highly recommended!`
+          eventId: transaction.eventId,
+          userId: transaction.userId,
+          rating: rating,
+          comment: comment
         }
       });
       reviews.push(review);
     }
   }
 
-  console.log('⭐ Created 20 reviews');
+  console.log(`⭐ Created ${reviews.length} reviews for completed events`);
 
   // Create email notifications for various events
   const notifications = [];
+  const notificationTemplates = [
+    {
+      type: NotificationType.TRANSACTION_ACCEPTED,
+      subject: "🎉 Transaction Approved!",
+      body: "Great news! Your transaction has been approved and your tickets are confirmed. We look forward to seeing you at the event!"
+    },
+    {
+      type: NotificationType.TRANSACTION_REJECTED,
+      subject: "❌ Transaction Rejected",
+      body: "We're sorry, but your transaction has been rejected. Please contact support if you have any questions or would like to try again."
+    },
+    {
+      type: NotificationType.TRANSACTION_ACCEPTED,
+      subject: "✅ Payment Confirmed",
+      body: "Your payment has been successfully processed and your tickets are ready. Check your email for ticket details."
+    },
+    {
+      type: NotificationType.TRANSACTION_REJECTED,
+      subject: "⚠️ Payment Issue",
+      body: "There was an issue with your payment. Please try again or contact our support team for assistance."
+    }
+  ];
+
   for (let i = 0; i < 15; i++) {
     const customer = getRandomItem(customers);
     const event = getRandomItem(events);
+    const template = getRandomItem(notificationTemplates);
     const notification = await prisma.emailNotification.create({
       data: {
         toUserId: customer.id,
-        type: getRandomItem([NotificationType.TRANSACTION_ACCEPTED, NotificationType.TRANSACTION_REJECTED]),
-        subject: `Transaction Update for ${event.title}`,
-        body: `This is a notification about your transaction for ${event.title}`,
+        type: template.type,
+        subject: template.subject,
+        body: template.body,
         status: getRandomItem([NotificationStatus.PENDING, NotificationStatus.SENT, NotificationStatus.FAILED])
       }
     });
@@ -520,33 +649,60 @@ async function main() {
   console.log('✅ Database seeding completed successfully!');
   console.log('\n📊 Data Summary:');
   console.log(`👥 Users: 10 (5 Organizers, 5 Customers)`);
-  console.log(`🎪 Events: 15 (Across 8 categories)`);
+  console.log(`🎪 Events: 15 (Across 8 categories with realistic titles and descriptions)`);
   console.log(`🎫 Ticket Types: ${ticketTypes.length} (Multiple tiers per event)`);
   console.log(`💰 Transactions: 30 (All statuses: WAITING_PAYMENT, WAITING_ADMIN_CONFIRMATION, DONE, REJECTED, EXPIRED, CANCELED)`);
-  console.log(`⭐ Reviews: 20 (For attended events)`);
-  console.log(`🎟️ Vouchers: 10 (Percentage and amount discounts)`);
-  console.log(`🎁 Coupons: 15 (Customer-specific rewards)`);
+  console.log(`⭐ Reviews: ${reviews.length} (For attended events with realistic comments)`);
+  console.log(`🎟️ Vouchers: 10 (Percentage and amount discounts with memorable codes)`);
+  console.log(`🎁 Coupons: 15 (Customer-specific rewards with themed codes)`);
   console.log(`🎯 Point Entries: 25+ (Various activities)`);
-  console.log(`📧 Email Notifications: 15 (Various types)`);
+  console.log(`📧 Email Notifications: 15 (Various types with realistic templates)`);
   console.log(`🎁 Referral Relationships: ${referrals.length}`);
   
   console.log('\n🔑 Test Accounts (all use password: password123):');
-  console.log('Organizers: organizer1@example.com to organizer5@example.com');
-  console.log('Customers: customer1@example.com to customer5@example.com');
+  console.log('Organizers:');
+  console.log('  - organizer1@example.com (Sarah Johnson)');
+  console.log('  - organizer2@example.com (Michael Chen)');
+  console.log('  - organizer3@example.com (Emily Rodriguez)');
+  console.log('  - organizer4@example.com (David Kim)');
+  console.log('  - organizer5@example.com (Lisa Thompson)');
+  console.log('Customers:');
+  console.log('  - customer1@example.com (John Smith)');
+  console.log('  - customer2@example.com (Maria Garcia)');
+  console.log('  - customer3@example.com (Ahmed Hassan)');
+  console.log('  - customer4@example.com (Jennifer Lee)');
+  console.log('  - customer5@example.com (Robert Wilson)');
   
   console.log('\n🎟️ Sample Voucher Codes:');
-  console.log('VOUCHER001, VOUCHER002, VOUCHER003, etc.');
+  console.log('EARLYBIRD20, SUMMER15, TECH10, MUSIC25, BUSINESS30, etc.');
   
   console.log('\n🎁 Sample Coupon Codes:');
-  console.log('COUPON001, COUPON002, COUPON003, etc.');
+  console.log('WELCOME10, FIRST15, LOYAL20, VIP25, SPECIAL30, etc.');
   
   console.log('\n📈 Transaction Status Distribution:');
-  console.log('- WAITING_PAYMENT: ~5 transactions');
-  console.log('- WAITING_ADMIN_CONFIRMATION: ~5 transactions');
-  console.log('- DONE: ~5 transactions');
-  console.log('- REJECTED: ~5 transactions');
-  console.log('- EXPIRED: ~5 transactions');
-  console.log('- CANCELED: ~5 transactions');
+  console.log('- WAITING_PAYMENT: 3 transactions');
+  console.log('- WAITING_ADMIN_CONFIRMATION: 3 transactions');
+  console.log('- DONE: 5 transactions');
+  console.log('- REJECTED: 2 transactions');
+  console.log('- EXPIRED: 2 transactions');
+  console.log('- CANCELED: 2 transactions');
+  
+  console.log('\n🎪 Sample Events:');
+  console.log('- Tech Conference 2024');
+  console.log('- Music Festival Summer');
+  console.log('- Business Networking Event');
+  console.log('- Educational Workshop Series');
+  console.log('- Sports Championship');
+  console.log('- Art Exhibition Opening');
+  console.log('- Community Meetup');
+  console.log('- Startup Pitch Competition');
+  console.log('- Web Development Bootcamp');
+  console.log('- Jazz Night Performance');
+  console.log('- Marketing Masterclass');
+  console.log('- Fitness Challenge');
+  console.log('- Photography Workshop');
+  console.log('- Local Business Fair');
+  console.log('- Innovation Summit');
 }
 
 main()
