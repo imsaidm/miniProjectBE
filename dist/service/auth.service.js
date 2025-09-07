@@ -15,15 +15,11 @@ const COUPON_VALUE = 10000;
 const COUPON_EXP_DAYS = 90;
 class AuthService {
     async register({ email, password, name, role, referralCode }) {
-        // cek email unik
         const exists = await prisma_1.prisma.user.findUnique({ where: { email } });
         if (exists)
             throw { status: 409, message: 'Email is already registered' };
-        // hash password
         const hashedPass = await bcryptjs_1.default.hash(password, 10);
-        // generate referral code user baru
         const userReferralCode = ((0, uuid_1.v4)().split('-')[0] || '').toUpperCase();
-        // payload user
         const userPayload = {
             email,
             password: hashedPass,
@@ -33,16 +29,13 @@ class AuthService {
         };
         if (referralCode)
             userPayload.referredByCode = referralCode;
-        // simpan user baru
         const user = await prisma_1.prisma.user.create({ data: userPayload });
-        // create email verification token
         const emailToken = (0, uuid_1.v4)();
         const emailTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
         await prisma_1.prisma.emailVerificationToken.create({
             data: { userId: user.id, token: emailToken, expiresAt: emailTokenExpiresAt }
         });
-        // send verification email (or log in dev)
-        const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
+        const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'https://mini-project-fe-gamma.vercel.app';
         const verifyUrl = `${frontendBaseUrl}/auth/verify?token=${encodeURIComponent(emailToken)}`;
         const subject = 'Verify your email address';
         const html = `
@@ -52,7 +45,6 @@ class AuthService {
       <p>If you did not sign up, you can ignore this email.</p>
     `;
         await (0, mailer_1.sendEmail)({ to: email, subject, html, text: `Verify your email: ${verifyUrl}` });
-        // kalau ada referral → kasih reward
         if (referralCode) {
             const referrer = await prisma_1.prisma.user.findUnique({ where: { referralCode } });
             if (referrer) {
@@ -71,7 +63,6 @@ class AuthService {
                         expiresAt,
                     },
                 });
-                // Update referrer's points balance
                 await prisma_1.prisma.user.update({
                     where: { id: referrer.id },
                     data: {
