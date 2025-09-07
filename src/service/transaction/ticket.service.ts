@@ -1,6 +1,28 @@
 import { prisma } from '../../config/prisma';
 
 export class TicketService {
+  async checkSeatAvailability(items: any[]) {
+    const ticketTypeIds = items.map((item: any) => item.ticketTypeId);
+    const tickets = await prisma.ticketType.findMany({ 
+      where: { id: { in: ticketTypeIds } } 
+    });
+    
+    const ticketMap = new Map(tickets.map((t: { id: number; availableSeats: number; priceIDR: number }) => [t.id, t]));
+    
+    for (const item of items) {
+      const ticket = ticketMap.get(item.ticketTypeId);
+      if (!ticket) {
+        throw new Error(`Ticket type ${item.ticketTypeId} not found`);
+      }
+      const typedTicket = ticket as { id: number; availableSeats: number; priceIDR: number };
+      if (!typedTicket.availableSeats || typedTicket.availableSeats < item.quantity) {
+        throw new Error(`Insufficient seats for ticketTypeId ${item.ticketTypeId}`);
+      }
+    }
+    
+    return true;
+  }
+
   async validateAndReserveTickets(items: any[], tx: any) {
     const ticketTypeIds = items.map((item: any) => item.ticketTypeId);
     const tickets = await tx.ticketType.findMany({ 
@@ -24,14 +46,24 @@ export class TicketService {
       item.__unitPriceIDR = typedTicket.priceIDR;
     }
     
-    // Reserve tickets
+    // Reserve tickets with additional safety check
     const updatePromises = items.map((item: any) => 
-      tx.ticketType.update({
-        where: { id: item.ticketTypeId },
+      tx.ticketType.updateMany({
+        where: { 
+          id: item.ticketTypeId,
+          availableSeats: { gte: item.quantity } // Ensure we have enough seats
+        },
         data: { availableSeats: { decrement: item.quantity } }
       })
     );
-    await Promise.all(updatePromises);
+    const results = await Promise.all(updatePromises);
+    
+    // Check if all updates were successful
+    for (let i = 0; i < results.length; i++) {
+      if (results[i].count === 0) {
+        throw new Error(`Failed to reserve seats for ticketTypeId ${items[i].ticketTypeId}. Seats may have been taken by another user.`);
+      }
+    }
     
     return { subtotal, items };
   }

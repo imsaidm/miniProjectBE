@@ -13,6 +13,17 @@ export class EventController {
                 const imageUrl = await uploadImageBuffer(file.buffer, 'event-banners');
                 body.bannerImage = imageUrl;
             }
+            
+            // Parse ticket types if provided as JSON string
+            if (body.ticketTypes && typeof body.ticketTypes === 'string') {
+                try {
+                    body.ticketTypes = JSON.parse(body.ticketTypes);
+                } catch (e) {
+                    console.error('Error parsing ticket types:', e);
+                    body.ticketTypes = [];
+                }
+            }
+            
             const event = await EventService.createEvent(organizerId, body);
             res.status(201).json(event);
         } catch (err) { next(err); }
@@ -68,8 +79,9 @@ export class EventController {
     }
     async createTicketType(req: Request, res: Response, next: NextFunction) {
         try {
+            const organizerId = (req as any).user.id;
             const eventId = parseInt(req.params.eventId || '0');
-            const ticket = await EventService.createTicketType(eventId, req.body);
+            const ticket = await EventService.createTicketTypeForEvent(eventId, organizerId, req.body);
             res.status(201).json(ticket);
         } catch (err) { next(err); }
     }

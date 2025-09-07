@@ -2,7 +2,7 @@ import { prisma, withRetry } from '../config/prisma';
 
 export class EventService {
   async createEvent(organizerId: number, data: any) {
-    const { title, description, location, category, startAt, endAt, basePriceIDR, totalSeats, availableSeats, bannerImage } = data;
+    const { title, description, location, category, startAt, endAt, basePriceIDR, totalSeats, availableSeats, bannerImage, ticketTypes } = data;
     
     return prisma.$transaction(async (tx) => {
       // Create the event
@@ -22,8 +22,23 @@ export class EventService {
         }
       });
       
-      // Create a default ticket type if basePriceIDR and totalSeats are provided
-      if (basePriceIDR !== undefined && basePriceIDR !== null && totalSeats !== undefined && totalSeats !== null && Number(totalSeats) > 0) {
+      // Create ticket types if provided
+      if (ticketTypes && Array.isArray(ticketTypes) && ticketTypes.length > 0) {
+        for (const ticketType of ticketTypes) {
+          if (ticketType.name && ticketType.name.trim()) {
+            await tx.ticketType.create({
+              data: {
+                eventId: event.id,
+                name: ticketType.name.trim(),
+                priceIDR: ticketType.priceIDR ? Number(ticketType.priceIDR) : 0,
+                totalSeats: ticketType.seats ? Number(ticketType.seats) : 0,
+                availableSeats: ticketType.seats ? Number(ticketType.seats) : 0
+              }
+            });
+          }
+        }
+      } else if (basePriceIDR !== undefined && basePriceIDR !== null && totalSeats !== undefined && totalSeats !== null && Number(totalSeats) > 0) {
+        // Fallback to creating a default ticket type if no ticket types provided
         await tx.ticketType.create({
           data: {
             eventId: event.id,
@@ -50,6 +65,11 @@ export class EventService {
     
     if (existingEvent.organizerId !== organizerId) {
       throw { status: 403, message: 'You can only edit your own events' };
+    }
+    
+    // Check if event is published - only draft events can be edited by organizers
+    if (existingEvent.status === 'PUBLISHED') {
+      throw { status: 403, message: 'Published events cannot be edited. Only draft events can be modified.' };
     }
     
     // Debug: log incoming keys to spot wrong field names from client
@@ -88,6 +108,24 @@ export class EventService {
     }
   }
   async deleteEvent(eventId: number, organizerId: number) {
+    // Verify the event belongs to the organizer and check status
+    const existingEvent = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+    
+    if (!existingEvent) {
+      throw { status: 404, message: 'Event not found' };
+    }
+    
+    if (existingEvent.organizerId !== organizerId) {
+      throw { status: 403, message: 'You can only delete your own events' };
+    }
+    
+    // Check if event is published - only draft events can be deleted by organizers
+    if (existingEvent.status === 'PUBLISHED') {
+      throw { status: 403, message: 'Published events cannot be deleted. Only draft events can be removed.' };
+    }
+    
     return prisma.event.delete({ where: { id: eventId, organizerId } });
   }
   async listEvents(params: any) {
@@ -187,12 +225,46 @@ export class EventService {
   async updateTicketType(ticketTypeId: number, organizerId: number, data: any) {
     const ticket = await prisma.ticketType.findUnique({ where: { id: ticketTypeId }, include: { event: true } });
     if (!ticket || ticket.event.organizerId !== organizerId) throw { status: 403, message: 'Forbidden' };
+    
+    // Check if event is published - only draft events can have ticket types modified
+    if (ticket.event.status === 'PUBLISHED') {
+      throw { status: 403, message: 'Published events cannot have ticket types modified. Only draft events can be edited.' };
+    }
+    
     return prisma.ticketType.update({ where: { id: ticketTypeId }, data });
   }
   async deleteTicketType(ticketTypeId: number, organizerId: number) {
     const ticket = await prisma.ticketType.findUnique({ where: { id: ticketTypeId }, include: { event: true } });
     if (!ticket || ticket.event.organizerId !== organizerId) throw { status: 403, message: 'Forbidden' };
+    
+    // Check if event is published - only draft events can have ticket types deleted
+    if (ticket.event.status === 'PUBLISHED') {
+      throw { status: 403, message: 'Published events cannot have ticket types deleted. Only draft events can be modified.' };
+    }
+    
     return prisma.ticketType.delete({ where: { id: ticketTypeId } });
+  }
+  
+  async createTicketTypeForEvent(eventId: number, organizerId: number, data: any) {
+    // Verify the event belongs to the organizer and check status
+    const event = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+    
+    if (!event) {
+      throw { status: 404, message: 'Event not found' };
+    }
+    
+    if (event.organizerId !== organizerId) {
+      throw { status: 403, message: 'You can only add ticket types to your own events' };
+    }
+    
+    // Check if event is published - only draft events can have ticket types added
+    if (event.status === 'PUBLISHED') {
+      throw { status: 403, message: 'Published events cannot have ticket types added. Only draft events can be modified.' };
+    }
+    
+    return prisma.ticketType.create({ data: { ...data, eventId } });
   }
 }
 

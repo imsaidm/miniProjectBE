@@ -15,6 +15,11 @@ export class DiscountService {
 
     if (!voucher) return { discountAmount: 0, voucherId: null };
 
+    // Check if voucher has reached its usage limit
+    if (voucher.maxUses && voucher.usedCount >= voucher.maxUses) {
+      return { discountAmount: 0, voucherId: null };
+    }
+
     const discountAmount = voucher.discountType === 'AMOUNT' 
       ? voucher.discountValue 
       : Math.floor(subtotal * (voucher.discountValue / 100));

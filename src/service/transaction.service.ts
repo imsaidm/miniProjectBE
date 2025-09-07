@@ -6,8 +6,26 @@ import ticketService from './transaction/ticket.service';
 import notificationService from './transaction/notification.service';
 
 export class TransactionService {
+  async checkSeatAvailability(items: any[]) {
+    return await ticketService.checkSeatAvailability(items);
+  }
+
   async createTransaction(userId: number, data: any) {
     const { eventId, items, voucherCode, couponCode, pointsUsed } = data;
+    
+    // Check if user is trying to book their own event
+    const event = await prisma.event.findUnique({
+      where: { id: eventId },
+      select: { organizerId: true, title: true }
+    });
+    
+    if (!event) {
+      throw { status: 404, message: 'Event not found' };
+    }
+    
+    if (event.organizerId === userId) {
+      throw { status: 403, message: 'Organizers cannot book tickets for their own events' };
+    }
     
     return await prisma.$transaction(async (tx) => {
       // Validate and reserve tickets

@@ -9,6 +9,16 @@ export class TransactionController {
             res.status(201).json(txn);
         } catch (err) { next(err); }
     }
+
+    async checkSeatAvailability(req: Request, res: Response, next: NextFunction) {
+        try {
+            const { items } = req.body;
+            await TransactionService.checkSeatAvailability(items);
+            res.status(200).json({ available: true });
+        } catch (err) { 
+            res.status(400).json({ available: false, message: (err as any).message });
+        }
+    }
     
     async uploadPaymentProof(req: Request, res: Response, next: NextFunction) {
         try {
