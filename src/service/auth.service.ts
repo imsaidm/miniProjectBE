@@ -19,18 +19,13 @@ interface RegisterDTO {
 
 export class AuthService {
   async register({ email, password, name, role, referralCode }: RegisterDTO) {
-    // cek email unik
     const exists = await prisma.user.findUnique({ where: { email } });
     if (exists) throw { status: 409, message: 'Email is already registered' };
 
-    // hash password
     const hashedPass = await bcrypt.hash(password, 10);
 
-    // generate referral code user baru
     const userReferralCode = (uuidv4().split('-')[0] || '').toUpperCase();
 
-
-    // payload user
     const userPayload: any = {
       email,
       password: hashedPass,
@@ -40,18 +35,15 @@ export class AuthService {
     };
     if (referralCode) userPayload.referredByCode = referralCode;
 
-    // simpan user baru
     const user = await prisma.user.create({ data: userPayload });
 
-    // create email verification token
     const emailToken = uuidv4();
     const emailTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
     await prisma.emailVerificationToken.create({
       data: { userId: user.id, token: emailToken, expiresAt: emailTokenExpiresAt }
     });
 
-    // send verification email (or log in dev)
-    const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
+    const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'https://mini-project-fe-gamma.vercel.app';
     const verifyUrl = `${frontendBaseUrl}/auth/verify?token=${encodeURIComponent(emailToken)}`;
     const subject = 'Verify your email address';
     const html = `
@@ -61,8 +53,6 @@ export class AuthService {
       <p>If you did not sign up, you can ignore this email.</p>
     `;
     await sendEmail({ to: email, subject, html, text: `Verify your email: ${verifyUrl}` });
-
-    // kalau ada referral → kasih reward
     if (referralCode) {
       const referrer = await prisma.user.findUnique({ where: { referralCode } });
       if (referrer) {
@@ -83,8 +73,6 @@ export class AuthService {
             expiresAt,
           },
         });
-
-        // Update referrer's points balance
         await prisma.user.update({
           where: { id: referrer.id },
           data: { 
