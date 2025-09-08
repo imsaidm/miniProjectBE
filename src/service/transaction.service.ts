@@ -32,7 +32,7 @@ export class TransactionService {
       const { subtotal, items: validatedItems } = await ticketService.validateAndReserveTickets(items, tx);
       
       // Apply discounts
-      const { discountAmount: discountVoucherIDR, voucherId } = await discountService.validateAndApplyVoucher(voucherCode, subtotal, tx);
+      const { discountAmount: discountVoucherIDR, voucherId } = await discountService.validateAndApplyVoucher(voucherCode, eventId, subtotal, tx);
       const { discountAmount: discountCouponIDR, couponId } = await discountService.validateAndApplyCoupon(couponCode, subtotal, userId, tx);
       
       // Handle points usage

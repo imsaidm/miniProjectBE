@@ -1,12 +1,13 @@
 import { prisma } from '../../config/prisma';
 
 export class DiscountService {
-  async validateAndApplyVoucher(voucherCode: string, subtotal: number, tx: any) {
+  async validateAndApplyVoucher(voucherCode: string, eventId: number, subtotal: number, tx: any) {
     if (!voucherCode) return { discountAmount: 0, voucherId: null };
 
     const voucher = await tx.voucher.findFirst({ 
       where: { 
-        code: voucherCode, 
+        code: { equals: voucherCode, mode: 'insensitive' },
+        eventId: Number(eventId),
         isActive: true, 
         startsAt: { lte: new Date() }, 
         endsAt: { gte: new Date() } 
