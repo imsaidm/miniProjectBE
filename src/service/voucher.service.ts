@@ -2,11 +2,55 @@ import { prisma } from '../config/prisma';
 
 export class VoucherService {
   async createVoucher(organizerId: number, eventId: number, data: any) {
+    // Validate that the organizer owns the event
+    const event = await prisma.event.findUnique({
+      where: { id: Number(eventId) },
+      select: { organizerId: true }
+    });
+    if (!event || event.organizerId !== organizerId) {
+      throw { status: 403, message: 'Forbidden: You do not own this event' };
+    }
+
+    // Coerce and validate incoming fields
+    const code: string = (data.code || '').toString().trim();
+    if (!code) {
+      throw { status: 400, message: 'Voucher code is required' };
+    }
+
+    const discountType = (data.discountType || 'AMOUNT').toString().toUpperCase();
+    const discountValue = Number(data.discountValue ?? 0);
+    const maxUses = data.maxUses !== undefined && data.maxUses !== null && data.maxUses !== ''
+      ? Number(data.maxUses)
+      : null;
+    const startsAt = new Date(data.startsAt);
+    const endsAt = new Date(data.endsAt);
+
+    if (isNaN(discountValue) || discountValue <= 0) {
+      throw { status: 400, message: 'discountValue must be a positive number' };
+    }
+    if (maxUses !== null && (isNaN(maxUses) || maxUses < 0)) {
+      throw { status: 400, message: 'maxUses must be a non-negative number' };
+    }
+    if (!(startsAt instanceof Date) || isNaN(startsAt.getTime())) {
+      throw { status: 400, message: 'startsAt must be a valid date' };
+    }
+    if (!(endsAt instanceof Date) || isNaN(endsAt.getTime())) {
+      throw { status: 400, message: 'endsAt must be a valid date' };
+    }
+    if (endsAt <= startsAt) {
+      throw { status: 400, message: 'endsAt must be after startsAt' };
+    }
+
     return prisma.voucher.create({
       data: {
-        ...data,
+        code,
         organizerId,
-        eventId,
+        eventId: Number(eventId),
+        discountType: discountType as any,
+        discountValue,
+        startsAt,
+        endsAt,
+        maxUses,
         isActive: true,
         usedCount: 0,
       }

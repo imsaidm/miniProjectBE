@@ -4,7 +4,7 @@ import { sendEmail } from '../../config/mailer';
 export class NotificationService {
   async createEmailNotification(userId: number, type: 'TRANSACTION_ACCEPTED' | 'TRANSACTION_REJECTED', subject: string, body: string) {
     try {
-      await prisma.emailNotification.create({ 
+      const created = await prisma.emailNotification.create({ 
         data: { 
           toUserId: userId, 
           type, 
@@ -13,6 +13,15 @@ export class NotificationService {
           status: 'PENDING' 
         } 
       });
+
+      // Attempt immediate send to avoid waiting for scheduler
+      try {
+        await this.sendEmailNotification(created.id);
+      } catch (err) {
+        // If immediate send fails, scheduler will retry later
+        // eslint-disable-next-line no-console
+        console.warn('Immediate email send failed; will retry via scheduler.', err);
+      }
     } catch (error) {
       console.error('Error creating email notification:', error);
       // Don't fail the main operation if notification fails
