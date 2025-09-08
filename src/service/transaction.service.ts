@@ -43,7 +43,7 @@ export class TransactionService {
       const txn = await tx.transaction.create({
         data: {
           userId, eventId, status: 'WAITING_PAYMENT',
-          paymentDueAt: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours
+          paymentDueAt: new Date(Date.now() + 2 * 60), // 2 hours - > 2 Minutes
           subtotalIDR: subtotal, discountVoucherIDR, discountCouponIDR,
           pointsUsed: actualPointsUsed, totalPayableIDR,
           usedVoucherId: voucherId ?? null, usedCouponId: couponId ?? null,
