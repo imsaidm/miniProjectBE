@@ -81,21 +81,34 @@ export class VoucherService {
 
   async validateVoucher(code: string, eventId: number, userId: number) {
     const normalized = (code || '').trim();
-    const variants = [normalized, normalized.toUpperCase(), normalized.toLowerCase()];
-    const voucher = await prisma.voucher.findFirst({
+    const now = new Date();
+    // Step 1: find voucher by code (case-insensitive) and eventId, independent of status/time
+    const base = await prisma.voucher.findFirst({
       where: {
         eventId: Number(eventId),
-        isActive: true,
-        startsAt: { lte: new Date() },
-        endsAt: { gte: new Date() },
-        OR: variants.map((v) => ({ code: v }))
+        OR: [
+          { code: normalized },
+          { code: normalized.toUpperCase() },
+          { code: normalized.toLowerCase() }
+        ]
       },
     });
-    if (!voucher) throw { status: 404, message: 'Voucher not valid for this event/date' };
-    if (voucher.maxUses && voucher.usedCount >= voucher.maxUses) {
+    if (!base) {
+      throw { status: 404, message: 'Voucher code not found for this event' };
+    }
+    // Step 2: active flag
+    if (!base.isActive) {
+      throw { status: 400, message: 'Voucher is inactive' };
+    }
+    // Step 3: time window (inclusive)
+    if (!(base.startsAt <= now && base.endsAt >= now)) {
+      throw { status: 400, message: 'Voucher is not valid at this time' };
+    }
+    // Step 4: usage limit
+    if (base.maxUses && base.usedCount >= base.maxUses) {
       throw { status: 400, message: 'Voucher usage limit reached' };
     }
-    return voucher;
+    return base;
   }
 }
 
