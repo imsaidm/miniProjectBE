@@ -100,8 +100,11 @@ export class VoucherService {
     if (!base.isActive) {
       throw { status: 400, message: 'Voucher is inactive' };
     }
-    // Step 3: time window (inclusive)
-    if (!(base.startsAt <= now && base.endsAt >= now)) {
+    // Step 3: time window (inclusive) – normalize to numeric for safety
+    const startMs = new Date(base.startsAt).getTime();
+    const endMs = new Date(base.endsAt).getTime();
+    const nowMs = now.getTime();
+    if (!(startMs <= nowMs && endMs >= nowMs)) {
       throw { status: 400, message: 'Voucher is not valid at this time' };
     }
     // Step 4: usage limit
