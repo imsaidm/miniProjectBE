@@ -80,13 +80,15 @@ export class VoucherService {
   }
 
   async validateVoucher(code: string, eventId: number, userId: number) {
+    const normalized = (code || '').trim();
+    const variants = [normalized, normalized.toUpperCase(), normalized.toLowerCase()];
     const voucher = await prisma.voucher.findFirst({
       where: {
-        code: { equals: code, mode: 'insensitive' },
         eventId: Number(eventId),
         isActive: true,
         startsAt: { lte: new Date() },
-        endsAt: { gte: new Date() }
+        endsAt: { gte: new Date() },
+        OR: variants.map((v) => ({ code: v }))
       },
     });
     if (!voucher) throw { status: 404, message: 'Voucher not valid for this event/date' };
