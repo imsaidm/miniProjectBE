@@ -33,7 +33,7 @@ export class TransactionService {
       
       // Apply discounts
       const { discountAmount: discountVoucherIDR, voucherId } = await discountService.validateAndApplyVoucher(voucherCode, subtotal, tx);
-      const { discountAmount: discountCouponIDR, couponId } = await discountService.validateAndApplyCoupon(couponCode, subtotal, tx);
+      const { discountAmount: discountCouponIDR, couponId } = await discountService.validateAndApplyCoupon(couponCode, subtotal, userId, tx);
       
       // Handle points usage
       const actualPointsUsed = await pointsService.validateAndUsePoints(userId, pointsUsed, tx);
@@ -113,6 +113,10 @@ export class TransactionService {
           data: { status: 'DONE' } 
         });
         
+        // Confirm voucher and coupon usage
+        await discountService.confirmVoucherUsage(txn.usedVoucherId, tx);
+        await discountService.confirmCouponUsage(txn.usedCouponId, transactionId, tx);
+        
         await ticketService.createAttendanceRecords(txn, tx);
         return done;
       }, {
@@ -130,11 +134,16 @@ export class TransactionService {
 
   async rejectTransaction(organizerId: number, transactionId: number) {
     return await prisma.$transaction(async (tx) => {
-      const txn = await tx.transaction.findUnique({ where: { id: transactionId }, include: { items: true } });
+      const txn = await tx.transaction.findUnique({ 
+        where: { id: transactionId }, 
+        include: { event: true, user: true, items: true } 
+      });
       if (!txn) throw new Error('Transaction not found');
+      if (txn.event.organizerId !== organizerId) throw new Error('Forbidden');
 
       await ticketService.releaseTickets(txn.items, tx);
       await discountService.refundCoupon(txn.usedCouponId, tx);
+      await discountService.refundVoucher(txn.usedVoucherId, tx);
       
       if (txn.pointsUsed && txn.pointsUsed > 0) {
         await pointsService.refundPoints(txn.userId, txn.pointsUsed, tx);
@@ -268,6 +277,7 @@ export class TransactionService {
     await prisma.$transaction(async (tx) => {
       await ticketService.releaseTickets(txn.items, tx);
       await discountService.refundCoupon(txn.usedCouponId, tx);
+      await discountService.refundVoucher(txn.usedVoucherId, tx);
       
       if (txn.pointsUsed && txn.pointsUsed > 0) {
         await pointsService.refundPoints(txn.userId, txn.pointsUsed, tx);

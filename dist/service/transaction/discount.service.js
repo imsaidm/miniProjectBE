@@ -22,18 +22,16 @@ class DiscountService {
         const discountAmount = voucher.discountType === 'AMOUNT'
             ? voucher.discountValue
             : Math.floor(subtotal * (voucher.discountValue / 100));
-        await tx.voucher.update({
-            where: { id: voucher.id },
-            data: { usedCount: { increment: 1 } }
-        });
+        // Don't increment usage count here - it will be done when transaction is confirmed
         return { discountAmount, voucherId: voucher.id };
     }
-    async validateAndApplyCoupon(couponCode, subtotal, tx) {
+    async validateAndApplyCoupon(couponCode, subtotal, userId, tx) {
         if (!couponCode)
             return { discountAmount: 0, couponId: null };
         const coupon = await tx.coupon.findFirst({
             where: {
                 code: couponCode,
+                userId: userId, // Ensure user owns the coupon
                 isUsed: false,
                 expiresAt: { gt: new Date() }
             }
@@ -43,10 +41,7 @@ class DiscountService {
         const discountAmount = coupon.discountType === 'AMOUNT'
             ? coupon.discountValue
             : Math.floor(subtotal * (coupon.discountValue / 100));
-        await tx.coupon.update({
-            where: { id: coupon.id },
-            data: { isUsed: true, usedAt: new Date() }
-        });
+        // Don't mark as used here - it will be done when transaction is confirmed
         return { discountAmount, couponId: coupon.id };
     }
     async refundCoupon(couponId, tx) {
@@ -54,7 +49,31 @@ class DiscountService {
             return;
         await tx.coupon.update({
             where: { id: couponId },
-            data: { isUsed: false, usedAt: null }
+            data: { isUsed: false, usedAt: null, usedByTxnId: null }
+        });
+    }
+    async refundVoucher(voucherId, tx) {
+        if (!voucherId)
+            return;
+        await tx.voucher.update({
+            where: { id: voucherId },
+            data: { usedCount: { decrement: 1 } }
+        });
+    }
+    async confirmVoucherUsage(voucherId, tx) {
+        if (!voucherId)
+            return;
+        await tx.voucher.update({
+            where: { id: voucherId },
+            data: { usedCount: { increment: 1 } }
+        });
+    }
+    async confirmCouponUsage(couponId, transactionId, tx) {
+        if (!couponId)
+            return;
+        await tx.coupon.update({
+            where: { id: couponId },
+            data: { isUsed: true, usedAt: new Date(), usedByTxnId: transactionId }
         });
     }
 }

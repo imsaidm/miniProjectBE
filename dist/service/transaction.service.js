@@ -32,7 +32,7 @@ class TransactionService {
             const { subtotal, items: validatedItems } = await ticket_service_1.default.validateAndReserveTickets(items, tx);
             // Apply discounts
             const { discountAmount: discountVoucherIDR, voucherId } = await discount_service_1.default.validateAndApplyVoucher(voucherCode, subtotal, tx);
-            const { discountAmount: discountCouponIDR, couponId } = await discount_service_1.default.validateAndApplyCoupon(couponCode, subtotal, tx);
+            const { discountAmount: discountCouponIDR, couponId } = await discount_service_1.default.validateAndApplyCoupon(couponCode, subtotal, userId, tx);
             // Handle points usage
             const actualPointsUsed = await points_service_1.default.validateAndUsePoints(userId, pointsUsed, tx);
             const totalPayableIDR = Math.max(subtotal - discountVoucherIDR - discountCouponIDR - actualPointsUsed, 0);
@@ -103,6 +103,9 @@ class TransactionService {
                     where: { id: transactionId },
                     data: { status: 'DONE' }
                 });
+                // Confirm voucher and coupon usage
+                await discount_service_1.default.confirmVoucherUsage(txn.usedVoucherId, tx);
+                await discount_service_1.default.confirmCouponUsage(txn.usedCouponId, transactionId, tx);
                 await ticket_service_1.default.createAttendanceRecords(txn, tx);
                 return done;
             }, {
@@ -119,11 +122,17 @@ class TransactionService {
     }
     async rejectTransaction(organizerId, transactionId) {
         return await prisma_1.prisma.$transaction(async (tx) => {
-            const txn = await tx.transaction.findUnique({ where: { id: transactionId }, include: { items: true } });
+            const txn = await tx.transaction.findUnique({
+                where: { id: transactionId },
+                include: { event: true, user: true, items: true }
+            });
             if (!txn)
                 throw new Error('Transaction not found');
+            if (txn.event.organizerId !== organizerId)
+                throw new Error('Forbidden');
             await ticket_service_1.default.releaseTickets(txn.items, tx);
             await discount_service_1.default.refundCoupon(txn.usedCouponId, tx);
+            await discount_service_1.default.refundVoucher(txn.usedVoucherId, tx);
             if (txn.pointsUsed && txn.pointsUsed > 0) {
                 await points_service_1.default.refundPoints(txn.userId, txn.pointsUsed, tx);
             }
@@ -236,6 +245,7 @@ class TransactionService {
         await prisma_1.prisma.$transaction(async (tx) => {
             await ticket_service_1.default.releaseTickets(txn.items, tx);
             await discount_service_1.default.refundCoupon(txn.usedCouponId, tx);
+            await discount_service_1.default.refundVoucher(txn.usedVoucherId, tx);
             if (txn.pointsUsed && txn.pointsUsed > 0) {
                 await points_service_1.default.refundPoints(txn.userId, txn.pointsUsed, tx);
             }
