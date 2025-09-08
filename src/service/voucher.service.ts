@@ -81,9 +81,18 @@ export class VoucherService {
 
   async validateVoucher(code: string, eventId: number, userId: number) {
     const voucher = await prisma.voucher.findFirst({
-      where: { code, eventId, isActive: true, startsAt: { lte: new Date() }, endsAt: { gte: new Date() } },
+      where: {
+        code: { equals: code, mode: 'insensitive' },
+        eventId: Number(eventId),
+        isActive: true,
+        startsAt: { lte: new Date() },
+        endsAt: { gte: new Date() }
+      },
     });
     if (!voucher) throw { status: 404, message: 'Voucher not valid for this event/date' };
+    if (voucher.maxUses && voucher.usedCount >= voucher.maxUses) {
+      throw { status: 400, message: 'Voucher usage limit reached' };
+    }
     return voucher;
   }
 }
