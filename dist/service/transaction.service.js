@@ -10,6 +10,7 @@ const points_service_1 = __importDefault(require("./transaction/points.service")
 const discount_service_1 = __importDefault(require("./transaction/discount.service"));
 const ticket_service_1 = __importDefault(require("./transaction/ticket.service"));
 const notification_service_1 = __importDefault(require("./transaction/notification.service"));
+const constants_1 = require("../utils/constants");
 class TransactionService {
     async checkSeatAvailability(items) {
         return await ticket_service_1.default.checkSeatAvailability(items);
@@ -39,7 +40,7 @@ class TransactionService {
             const txn = await tx.transaction.create({
                 data: {
                     userId, eventId, status: 'WAITING_PAYMENT',
-                    paymentDueAt: new Date(Date.now() + 2 * 60 * 1000), // 2 hours -> 2 Minutes
+                    paymentDueAt: new Date(Date.now() + constants_1.APP_CONSTANTS.PAYMENT_TIMEOUT_HOURS * 60 * 60 * 1000), // 2 hours
                     subtotalIDR: subtotal, discountVoucherIDR, discountCouponIDR,
                     pointsUsed: actualPointsUsed, totalPayableIDR,
                     usedVoucherId: voucherId ?? null, usedCouponId: couponId ?? null,
@@ -221,7 +222,9 @@ class TransactionService {
             where: { status: 'WAITING_PAYMENT', paymentDueAt: { lt: now } },
             include: { items: true }
         });
+        console.log(`[SCHEDULER] Found ${overdue.length} overdue transactions at ${now.toISOString()}`);
         for (const txn of overdue) {
+            console.log(`[SCHEDULER] Expiring transaction ${txn.id}, due at ${txn.paymentDueAt}, now ${now}`);
             await this._rollbackTransaction(txn);
         }
         return { expiredCount: overdue.length };

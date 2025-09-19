@@ -4,6 +4,7 @@ import pointsService from './transaction/points.service';
 import discountService from './transaction/discount.service';
 import ticketService from './transaction/ticket.service';
 import notificationService from './transaction/notification.service';
+import { APP_CONSTANTS } from '../utils/constants';
 
 export class TransactionService {
   async checkSeatAvailability(items: any[]) {
@@ -43,7 +44,7 @@ export class TransactionService {
       const txn = await tx.transaction.create({
         data: {
           userId, eventId, status: 'WAITING_PAYMENT',
-          paymentDueAt: new Date(Date.now() + 2 * 60 * 1000), // 2 hours -> 2 Minutes
+          paymentDueAt: new Date(Date.now() + APP_CONSTANTS.PAYMENT_TIMEOUT_HOURS * 60 * 60 * 1000), // 2 hours
           subtotalIDR: subtotal, discountVoucherIDR, discountCouponIDR,
           pointsUsed: actualPointsUsed, totalPayableIDR,
           usedVoucherId: voucherId ?? null, usedCouponId: couponId ?? null,
@@ -247,7 +248,10 @@ export class TransactionService {
       include: { items: true }
     });
     
+    console.log(`[SCHEDULER] Found ${overdue.length} overdue transactions at ${now.toISOString()}`);
+    
     for (const txn of overdue) {
+      console.log(`[SCHEDULER] Expiring transaction ${txn.id}, due at ${txn.paymentDueAt}, now ${now}`);
       await this._rollbackTransaction(txn);
     }
     
