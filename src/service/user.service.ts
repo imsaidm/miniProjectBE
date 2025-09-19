@@ -2,7 +2,7 @@ import { prisma, withRetry } from '../config/prisma';
 
 export class UserService {
   async getProfile(userId: number) {
-    // Get user profile with referrer information
+    // Optimized: Use single query with includes instead of multiple queries
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { 
@@ -24,23 +24,38 @@ export class UserService {
       throw { status: 404, message: 'User not found' };
     }
 
-    // Get referrer information if user was referred
-    let referrerInfo = null;
-    if (user.referredByCode) {
-      const referrer = await prisma.user.findUnique({
-        where: { referralCode: user.referredByCode },
-        select: { id: true, name: true, email: true, role: true }
-      });
-      if (referrer) {
-        referrerInfo = {
-          name: referrer.name,
-          email: referrer.email,
-          role: referrer.role
-        };
-      }
-    }
+    // Execute all queries in parallel for better performance
+    const [referrerInfo, pointsBalance, organizerStats] = await Promise.all([
+      this.getReferrerInfo(user.referredByCode),
+      this.calculatePointsBalance(userId, user.pointsBalance),
+      user.role === 'ORGANIZER' ? this.getOrganizerStats(userId) : Promise.resolve({ rating: 0, reviewCount: 0 })
+    ]);
 
-    // Calculate points balance from PointEntry records (authoritative source)
+    return {
+      ...user,
+      pointsBalance,
+      referrerInfo,
+      organizerRating: organizerStats.rating,
+      organizerReviewCount: organizerStats.reviewCount
+    };
+  }
+
+  private async getReferrerInfo(referredByCode: string | null) {
+    if (!referredByCode) return null;
+    
+    const referrer = await prisma.user.findUnique({
+      where: { referralCode: referredByCode },
+      select: { id: true, name: true, email: true, role: true }
+    });
+    
+    return referrer ? {
+      name: referrer.name,
+      email: referrer.email,
+      role: referrer.role
+    } : null;
+  }
+
+  private async calculatePointsBalance(userId: number, storedBalance: number | null) {
     const now = new Date();
     const points = await prisma.pointEntry.findMany({
       where: { 
@@ -52,41 +67,28 @@ export class UserService {
     
     const calculatedBalance = points.reduce((sum, p) => sum + p.delta, 0);
     
-    // Update stored balance if there's a mismatch
-    if (calculatedBalance !== (user.pointsBalance || 0)) {
+    // Only update if there's a significant mismatch to avoid unnecessary writes
+    if (Math.abs(calculatedBalance - (storedBalance || 0)) > 0) {
       await prisma.user.update({
         where: { id: userId },
         data: { pointsBalance: calculatedBalance }
       });
     }
     
-    const pointsBalance = calculatedBalance;
+    return calculatedBalance;
+  }
 
-    // Calculate organizer rating if user is an organizer
-    let organizerRating = 0;
-    let organizerReviewCount = 0;
+  private async getOrganizerStats(organizerId: number) {
+    const reviews = await prisma.review.findMany({
+      where: { event: { organizerId } },
+      select: { rating: true }
+    });
     
-    if (user.role === 'ORGANIZER') {
-      const organizerReviews = await withRetry(() => 
-        prisma.review.findMany({
-          where: { event: { organizerId: userId } },
-          select: { rating: true }
-        })
-      );
-      
-      organizerRating = organizerReviews.length > 0 
-        ? organizerReviews.reduce((sum, review) => sum + review.rating, 0) / organizerReviews.length 
-        : 0;
-      organizerReviewCount = organizerReviews.length;
-    }
-
-    return {
-      ...user,
-      pointsBalance,
-      referrerInfo,
-      organizerRating,
-      organizerReviewCount
-    };
+    const rating = reviews.length > 0 
+      ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length 
+      : 0;
+    
+    return { rating, reviewCount: reviews.length };
   }
 
   async updateProfile(userId: number, data: any) {

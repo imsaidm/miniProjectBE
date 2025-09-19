@@ -78,6 +78,11 @@ model User {
   PasswordResetToken     PasswordResetToken[]
   Voucher                Voucher[]
   EmailNotification      EmailNotification[]
+
+  @@index([role])
+  @@index([isVerified])
+  @@index([referralCode])
+  @@index([referredByCode])
 }
 
 model EmailVerificationToken {
@@ -222,6 +227,9 @@ model Transaction {
   @@index([userId, status])
   @@index([eventId, status])
   @@index([paymentDueAt])
+  @@index([status, paymentDueAt])
+  @@index([createdAt])
+  @@index([organizerDecisionBy])
 }
 
 model TransactionItem {

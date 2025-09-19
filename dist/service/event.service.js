@@ -143,30 +143,64 @@ class EventService {
             ...(startAt && { startAt: { gte: new Date(startAt) } }),
             ...(endAt && { endAt: { lte: new Date(endAt) } })
         };
+        // Get events with organizer info
         const events = await prisma_1.prisma.event.findMany({
             where,
-            include: { organizer: { select: { id: true, name: true, profileImg: true } } },
+            include: {
+                organizer: {
+                    select: {
+                        id: true,
+                        name: true,
+                        profileImg: true
+                    }
+                }
+            },
             orderBy: { startAt: 'asc' }
         });
-        // Calculate organizer ratings for each event
-        const eventsWithRatings = await Promise.all(events.map(async (event) => {
-            const organizerReviews = await (0, prisma_1.withRetry)(() => prisma_1.prisma.review.findMany({
-                where: { event: { organizerId: event.organizerId } },
-                select: { rating: true }
-            }));
-            const organizerRating = organizerReviews.length > 0
-                ? organizerReviews.reduce((sum, review) => sum + review.rating, 0) / organizerReviews.length
-                : 0;
+        // Get organizer ratings separately for better performance
+        const organizerIds = [...new Set(events.map(event => event.organizerId))];
+        const organizerReviews = await prisma_1.prisma.review.findMany({
+            where: {
+                event: {
+                    organizerId: { in: organizerIds }
+                }
+            },
+            select: {
+                rating: true,
+                event: {
+                    select: {
+                        organizerId: true
+                    }
+                }
+            }
+        });
+        // Calculate ratings by organizer
+        const organizerStats = new Map();
+        organizerReviews.forEach(review => {
+            const organizerId = review.event.organizerId;
+            if (!organizerStats.has(organizerId)) {
+                organizerStats.set(organizerId, { rating: 0, reviewCount: 0 });
+            }
+            const stats = organizerStats.get(organizerId);
+            stats.rating += review.rating;
+            stats.reviewCount += 1;
+        });
+        // Calculate average ratings
+        organizerStats.forEach((stats, organizerId) => {
+            stats.rating = stats.reviewCount > 0 ? stats.rating / stats.reviewCount : 0;
+        });
+        // Apply ratings to events
+        return events.map(event => {
+            const stats = organizerStats.get(event.organizerId) || { rating: 0, reviewCount: 0 };
             return {
                 ...event,
                 organizer: {
                     ...event.organizer,
-                    rating: organizerRating,
-                    reviewCount: organizerReviews.length
+                    rating: stats.rating,
+                    reviewCount: stats.reviewCount
                 }
             };
-        }));
-        return eventsWithRatings;
+        });
     }
     async getOrganizerEvents(organizerId) {
         return prisma_1.prisma.event.findMany({

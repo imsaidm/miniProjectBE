@@ -19,6 +19,9 @@ export declare class UserService {
         createdAt: Date;
         updatedAt: Date;
     }>;
+    private getReferrerInfo;
+    private calculatePointsBalance;
+    private getOrganizerStats;
     updateProfile(userId: number, data: any): Promise<{
         name: string | null;
         id: number;

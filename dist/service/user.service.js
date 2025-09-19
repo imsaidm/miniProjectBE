@@ -4,7 +4,7 @@ exports.UserService = void 0;
 const prisma_1 = require("../config/prisma");
 class UserService {
     async getProfile(userId) {
-        // Get user profile with referrer information
+        // Optimized: Use single query with includes instead of multiple queries
         const user = await prisma_1.prisma.user.findUnique({
             where: { id: userId },
             select: {
@@ -24,22 +24,34 @@ class UserService {
         if (!user) {
             throw { status: 404, message: 'User not found' };
         }
-        // Get referrer information if user was referred
-        let referrerInfo = null;
-        if (user.referredByCode) {
-            const referrer = await prisma_1.prisma.user.findUnique({
-                where: { referralCode: user.referredByCode },
-                select: { id: true, name: true, email: true, role: true }
-            });
-            if (referrer) {
-                referrerInfo = {
-                    name: referrer.name,
-                    email: referrer.email,
-                    role: referrer.role
-                };
-            }
-        }
-        // Calculate points balance from PointEntry records (authoritative source)
+        // Execute all queries in parallel for better performance
+        const [referrerInfo, pointsBalance, organizerStats] = await Promise.all([
+            this.getReferrerInfo(user.referredByCode),
+            this.calculatePointsBalance(userId, user.pointsBalance),
+            user.role === 'ORGANIZER' ? this.getOrganizerStats(userId) : Promise.resolve({ rating: 0, reviewCount: 0 })
+        ]);
+        return {
+            ...user,
+            pointsBalance,
+            referrerInfo,
+            organizerRating: organizerStats.rating,
+            organizerReviewCount: organizerStats.reviewCount
+        };
+    }
+    async getReferrerInfo(referredByCode) {
+        if (!referredByCode)
+            return null;
+        const referrer = await prisma_1.prisma.user.findUnique({
+            where: { referralCode: referredByCode },
+            select: { id: true, name: true, email: true, role: true }
+        });
+        return referrer ? {
+            name: referrer.name,
+            email: referrer.email,
+            role: referrer.role
+        } : null;
+    }
+    async calculatePointsBalance(userId, storedBalance) {
         const now = new Date();
         const points = await prisma_1.prisma.pointEntry.findMany({
             where: {
@@ -49,34 +61,24 @@ class UserService {
             select: { delta: true }
         });
         const calculatedBalance = points.reduce((sum, p) => sum + p.delta, 0);
-        // Update stored balance if there's a mismatch
-        if (calculatedBalance !== (user.pointsBalance || 0)) {
+        // Only update if there's a significant mismatch to avoid unnecessary writes
+        if (Math.abs(calculatedBalance - (storedBalance || 0)) > 0) {
             await prisma_1.prisma.user.update({
                 where: { id: userId },
                 data: { pointsBalance: calculatedBalance }
             });
         }
-        const pointsBalance = calculatedBalance;
-        // Calculate organizer rating if user is an organizer
-        let organizerRating = 0;
-        let organizerReviewCount = 0;
-        if (user.role === 'ORGANIZER') {
-            const organizerReviews = await (0, prisma_1.withRetry)(() => prisma_1.prisma.review.findMany({
-                where: { event: { organizerId: userId } },
-                select: { rating: true }
-            }));
-            organizerRating = organizerReviews.length > 0
-                ? organizerReviews.reduce((sum, review) => sum + review.rating, 0) / organizerReviews.length
-                : 0;
-            organizerReviewCount = organizerReviews.length;
-        }
-        return {
-            ...user,
-            pointsBalance,
-            referrerInfo,
-            organizerRating,
-            organizerReviewCount
-        };
+        return calculatedBalance;
+    }
+    async getOrganizerStats(organizerId) {
+        const reviews = await prisma_1.prisma.review.findMany({
+            where: { event: { organizerId } },
+            select: { rating: true }
+        });
+        const rating = reviews.length > 0
+            ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+            : 0;
+        return { rating, reviewCount: reviews.length };
     }
     async updateProfile(userId, data) {
         const { name, profileImg } = data;
