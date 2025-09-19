@@ -31,7 +31,7 @@ class TransactionService {
             // Validate and reserve tickets
             const { subtotal, items: validatedItems } = await ticket_service_1.default.validateAndReserveTickets(items, tx);
             // Apply discounts
-            const { discountAmount: discountVoucherIDR, voucherId } = await discount_service_1.default.validateAndApplyVoucher(voucherCode, subtotal, tx);
+            const { discountAmount: discountVoucherIDR, voucherId } = await discount_service_1.default.validateAndApplyVoucher(voucherCode, eventId, subtotal, tx);
             const { discountAmount: discountCouponIDR, couponId } = await discount_service_1.default.validateAndApplyCoupon(couponCode, subtotal, userId, tx);
             // Handle points usage
             const actualPointsUsed = await points_service_1.default.validateAndUsePoints(userId, pointsUsed, tx);
@@ -39,7 +39,7 @@ class TransactionService {
             const txn = await tx.transaction.create({
                 data: {
                     userId, eventId, status: 'WAITING_PAYMENT',
-                    paymentDueAt: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours
+                    paymentDueAt: new Date(Date.now() + 2 * 60 * 1000), // 2 hours -> 2 Minutes
                     subtotalIDR: subtotal, discountVoucherIDR, discountCouponIDR,
                     pointsUsed: actualPointsUsed, totalPayableIDR,
                     usedVoucherId: voucherId ?? null, usedCouponId: couponId ?? null,

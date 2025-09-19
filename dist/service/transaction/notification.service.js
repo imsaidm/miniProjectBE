@@ -6,7 +6,7 @@ const mailer_1 = require("../../config/mailer");
 class NotificationService {
     async createEmailNotification(userId, type, subject, body) {
         try {
-            await prisma_1.prisma.emailNotification.create({
+            const created = await prisma_1.prisma.emailNotification.create({
                 data: {
                     toUserId: userId,
                     type,
@@ -15,6 +15,15 @@ class NotificationService {
                     status: 'PENDING'
                 }
             });
+            // Attempt immediate send to avoid waiting for scheduler
+            try {
+                await this.sendEmailNotification(created.id);
+            }
+            catch (err) {
+                // If immediate send fails, scheduler will retry later
+                // eslint-disable-next-line no-console
+                console.warn('Immediate email send failed; will retry via scheduler.', err);
+            }
         }
         catch (error) {
             console.error('Error creating email notification:', error);

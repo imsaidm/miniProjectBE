@@ -55,6 +55,7 @@ class AuthService {
                         refereeId: user.id,
                     },
                 });
+                // Give points to referrer
                 await prisma_1.prisma.pointEntry.create({
                     data: {
                         userId: referrer.id,
@@ -71,6 +72,24 @@ class AuthService {
                         }
                     }
                 });
+                // Give points to referee (person who used the referral code)
+                await prisma_1.prisma.pointEntry.create({
+                    data: {
+                        userId: user.id,
+                        delta: POINTS_REFERRAL_REWARD,
+                        source: 'REFERRAL_REWARD',
+                        expiresAt,
+                    },
+                });
+                await prisma_1.prisma.user.update({
+                    where: { id: user.id },
+                    data: {
+                        pointsBalance: {
+                            increment: POINTS_REFERRAL_REWARD
+                        }
+                    }
+                });
+                // Give coupon to referee
                 await prisma_1.prisma.coupon.create({
                     data: {
                         code: (0, uuid_1.v4)(),

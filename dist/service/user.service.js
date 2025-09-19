@@ -16,6 +16,7 @@ class UserService {
                 isVerified: true,
                 referralCode: true,
                 referredByCode: true,
+                pointsBalance: true,
                 createdAt: true,
                 updatedAt: true
             }
@@ -38,7 +39,7 @@ class UserService {
                 };
             }
         }
-        // Calculate current points balance (only non-expired points)
+        // Calculate points balance from PointEntry records (authoritative source)
         const now = new Date();
         const points = await prisma_1.prisma.pointEntry.findMany({
             where: {
@@ -47,7 +48,15 @@ class UserService {
             },
             select: { delta: true }
         });
-        const pointsBalance = points.reduce((sum, p) => sum + p.delta, 0);
+        const calculatedBalance = points.reduce((sum, p) => sum + p.delta, 0);
+        // Update stored balance if there's a mismatch
+        if (calculatedBalance !== (user.pointsBalance || 0)) {
+            await prisma_1.prisma.user.update({
+                where: { id: userId },
+                data: { pointsBalance: calculatedBalance }
+            });
+        }
+        const pointsBalance = calculatedBalance;
         // Calculate organizer rating if user is an organizer
         let organizerRating = 0;
         let organizerReviewCount = 0;
@@ -82,8 +91,22 @@ class UserService {
             where: { userId, expiresAt: { gt: now } },
             select: { delta: true, expiresAt: true, createdAt: true, source: true }
         });
-        const balance = points.reduce((sum, p) => sum + p.delta, 0);
-        return { balance, details: points };
+        // Calculate balance from PointEntry records (this is the authoritative source)
+        const calculatedBalance = points.reduce((sum, p) => sum + p.delta, 0);
+        // Get the stored balance from user table
+        const user = await prisma_1.prisma.user.findUnique({
+            where: { id: userId },
+            select: { pointsBalance: true }
+        });
+        const storedBalance = user?.pointsBalance || 0;
+        // If there's a mismatch, update the stored balance
+        if (calculatedBalance !== storedBalance) {
+            await prisma_1.prisma.user.update({
+                where: { id: userId },
+                data: { pointsBalance: calculatedBalance }
+            });
+        }
+        return { balance: calculatedBalance, details: points };
     }
     async getCoupons(userId) {
         const now = new Date();

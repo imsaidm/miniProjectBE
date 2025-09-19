@@ -2,12 +2,13 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DiscountService = void 0;
 class DiscountService {
-    async validateAndApplyVoucher(voucherCode, subtotal, tx) {
+    async validateAndApplyVoucher(voucherCode, eventId, subtotal, tx) {
         if (!voucherCode)
             return { discountAmount: 0, voucherId: null };
         const voucher = await tx.voucher.findFirst({
             where: {
-                code: voucherCode,
+                code: { equals: voucherCode, mode: 'insensitive' },
+                eventId: Number(eventId),
                 isActive: true,
                 startsAt: { lte: new Date() },
                 endsAt: { gte: new Date() }

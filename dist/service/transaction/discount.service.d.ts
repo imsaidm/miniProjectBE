@@ -1,5 +1,5 @@
 export declare class DiscountService {
-    validateAndApplyVoucher(voucherCode: string, subtotal: number, tx: any): Promise<{
+    validateAndApplyVoucher(voucherCode: string, eventId: number, subtotal: number, tx: any): Promise<{
         discountAmount: any;
         voucherId: any;
     }>;
