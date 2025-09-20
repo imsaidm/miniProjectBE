@@ -68,49 +68,73 @@ async function main() {
 
   console.log('🧹 Cleared existing data');
 
-  // Create 5 Organizers with realistic names
-  const organizerNames = [
-    "Sarah Johnson", "Michael Chen", "Emily Rodriguez", "David Kim", "Lisa Thompson"
+  // Create 8 Organizers with realistic names and companies
+  const organizerData = [
+    { name: "Sarah Johnson", email: "sarah@techventures.com", company: "TechVentures" },
+    { name: "Michael Chen", email: "michael@musicfest.com", company: "MusicFest Productions" },
+    { name: "Emily Rodriguez", email: "emily@businesshub.com", company: "Business Hub" },
+    { name: "David Kim", email: "david@edulab.com", company: "EduLab" },
+    { name: "Lisa Thompson", email: "lisa@artgallery.com", company: "Art Gallery" },
+    { name: "James Wilson", email: "james@sportsevents.com", company: "Sports Events Co" },
+    { name: "Maria Garcia", email: "maria@communityhub.com", company: "Community Hub" },
+    { name: "Alex Brown", email: "alex@startupinc.com", company: "Startup Inc" }
   ];
   const organizers = [];
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 0; i < organizerData.length; i++) {
+    const organizerInfo = organizerData[i];
+    if (!organizerInfo) continue;
+    
     const organizer = await prisma.user.create({
       data: {
-        email: `organizer${i}@example.com`,
+        email: organizerInfo.email,
         password: await bcrypt.hash('password123', 10),
-        name: organizerNames[i - 1] || `Organizer ${i}`,
+        name: organizerInfo.name,
         role: 'ORGANIZER',
         isVerified: true,
-        referralCode: `ORG${i.toString().padStart(3, '0')}`,
-        pointsBalance: getRandomNumber(5000, 20000),
-        profileImg: userImages[i - 1] || null
+        referralCode: `ORG${(i + 1).toString().padStart(3, '0')}`,
+        pointsBalance: getRandomNumber(10000, 50000),
+        profileImg: userImages[i] || null
       }
     });
     organizers.push(organizer);
   }
 
-  // Create 5 Customers with realistic names
-  const customerNames = [
-    "John Smith", "Maria Garcia", "Ahmed Hassan", "Jennifer Lee", "Robert Wilson"
+  // Create 12 Customers with realistic names and profiles
+  const customerData = [
+    { name: "John Smith", email: "john.smith@gmail.com", occupation: "Software Engineer" },
+    { name: "Maria Garcia", email: "maria.garcia@yahoo.com", occupation: "Marketing Manager" },
+    { name: "Ahmed Hassan", email: "ahmed.hassan@outlook.com", occupation: "Business Analyst" },
+    { name: "Jennifer Lee", email: "jennifer.lee@hotmail.com", occupation: "Designer" },
+    { name: "Robert Wilson", email: "robert.wilson@gmail.com", occupation: "Consultant" },
+    { name: "Anna Kowalski", email: "anna.kowalski@gmail.com", occupation: "Teacher" },
+    { name: "Carlos Rodriguez", email: "carlos.rodriguez@yahoo.com", occupation: "Developer" },
+    { name: "Sophie Martin", email: "sophie.martin@outlook.com", occupation: "Project Manager" },
+    { name: "Kevin Park", email: "kevin.park@gmail.com", occupation: "Data Scientist" },
+    { name: "Emma Thompson", email: "emma.thompson@hotmail.com", occupation: "Writer" },
+    { name: "Daniel Kim", email: "daniel.kim@gmail.com", occupation: "Entrepreneur" },
+    { name: "Lisa Anderson", email: "lisa.anderson@yahoo.com", occupation: "Freelancer" }
   ];
   const customers = [];
-  for (let i = 1; i <= 5; i++) {
+  for (let i = 0; i < customerData.length; i++) {
+    const customerInfo = customerData[i];
+    if (!customerInfo) continue;
+    
     const customer = await prisma.user.create({
       data: {
-        email: `customer${i}@example.com`,
+        email: customerInfo.email,
         password: await bcrypt.hash('password123', 10),
-        name: customerNames[i - 1] || `Customer ${i}`,
+        name: customerInfo.name,
         role: 'CUSTOMER',
         isVerified: true,
-        referralCode: `CUST${i.toString().padStart(3, '0')}`,
-        pointsBalance: getRandomNumber(0, 10000),
-        profileImg: userImages[i + 4] || null // Use different images for customers
+        referralCode: `CUST${(i + 1).toString().padStart(3, '0')}`,
+        pointsBalance: getRandomNumber(0, 25000),
+        profileImg: userImages[i + 8] || null
       }
     });
     customers.push(customer);
   }
 
-  console.log('👥 Created 10 users (5 Organizers, 5 Customers)');
+  console.log('👥 Created 20 users (8 Organizers, 12 Customers)');
 
   // Create referral relationships
   const referrals = [];
@@ -168,14 +192,19 @@ async function main() {
 
   console.log('🎁 Created referral relationships and rewards');
 
-  // Create 15 Events across different categories with more realistic data
+  // Create 25 Events across different categories with more realistic data
   const eventCategories = [EventCategory.TECH, EventCategory.MUSIC, EventCategory.BUSINESS, EventCategory.EDUCATION, EventCategory.SPORTS, EventCategory.ART, EventCategory.COMMUNITY, EventCategory.OTHER];
   const eventStatuses = [EventStatus.PUBLISHED, EventStatus.DRAFT, EventStatus.CANCELED];
   const eventTitles = [
     "Tech Conference 2024", "Music Festival Summer", "Business Networking Event", "Educational Workshop Series",
     "Sports Championship", "Art Exhibition Opening", "Community Meetup", "Startup Pitch Competition",
     "Web Development Bootcamp", "Jazz Night Performance", "Marketing Masterclass", "Fitness Challenge",
-    "Photography Workshop", "Local Business Fair", "Innovation Summit"
+    "Photography Workshop", "Local Business Fair", "Innovation Summit", "AI & Machine Learning Summit",
+    "Digital Marketing Conference", "Blockchain Technology Workshop", "Sustainable Business Forum",
+    "Creative Writing Workshop", "Data Science Bootcamp", "UX/UI Design Masterclass", "E-commerce Summit",
+    "Cybersecurity Conference", "Mobile App Development Workshop", "Leadership Development Program",
+    "Financial Planning Seminar", "Health & Wellness Expo", "Environmental Sustainability Conference",
+    "Women in Tech Meetup", "Youth Entrepreneurship Summit", "Senior Citizens Tech Workshop"
   ];
   const eventDescriptions = [
     "Join industry leaders and innovators for a day of cutting-edge technology discussions, networking, and hands-on workshops.",
@@ -202,7 +231,7 @@ async function main() {
   ];
   const events = [];
 
-  for (let i = 1; i <= 15; i++) {
+  for (let i = 1; i <= 25; i++) {
     const organizer = getRandomItem(organizers);
     const category = getRandomItem(eventCategories);
     const status = getRandomItem(eventStatuses);
@@ -228,7 +257,7 @@ async function main() {
     events.push(event);
   }
 
-  console.log('🎪 Created 15 events across different categories');
+  console.log('🎪 Created 25 events across different categories');
 
   // Create ticket types for each event
   const ticketTypes = [];
@@ -316,7 +345,7 @@ async function main() {
 
   console.log('🎁 Created 15 coupons');
 
-  // Create 30 transactions with various statuses and better distribution
+  // Create 50 transactions with various statuses and better distribution
   const transactionStatuses = [
     TransactionStatus.WAITING_PAYMENT, TransactionStatus.WAITING_PAYMENT, TransactionStatus.WAITING_PAYMENT, // 3 waiting payment
     TransactionStatus.WAITING_ADMIN_CONFIRMATION, TransactionStatus.WAITING_ADMIN_CONFIRMATION, TransactionStatus.WAITING_ADMIN_CONFIRMATION, // 3 waiting confirmation
@@ -328,7 +357,7 @@ async function main() {
   const transactions = [];
   const usedCoupons = new Set<number>();
 
-  for (let i = 1; i <= 30; i++) {
+  for (let i = 1; i <= 50; i++) {
     const customer = getRandomItem(customers);
     const event = getRandomItem(events);
     const status = getRandomItem(transactionStatuses);
@@ -496,7 +525,7 @@ async function main() {
     }
   }
 
-  console.log('💰 Created 30 transactions with various statuses');
+  console.log('💰 Created 50 transactions with various statuses');
 
   // Create reviews for completed events
   const reviews = [];
@@ -529,7 +558,7 @@ async function main() {
     include: { event: true, user: true }
   });
 
-  for (let i = 0; i < Math.min(completedTransactions.length, 25); i++) {
+  for (let i = 0; i < Math.min(completedTransactions.length, 40); i++) {
     const transaction = completedTransactions[i];
     if (!transaction) continue;
     
@@ -584,7 +613,7 @@ async function main() {
     }
   ];
 
-  for (let i = 0; i < 15; i++) {
+  for (let i = 0; i < 25; i++) {
     const customer = getRandomItem(customers);
     const event = getRandomItem(events);
     const template = getRandomItem(notificationTemplates);
@@ -600,10 +629,10 @@ async function main() {
     notifications.push(notification);
   }
 
-  console.log('📧 Created 15 email notifications');
+  console.log('📧 Created 25 email notifications');
 
   // Create additional point entries for various activities
-  for (let i = 0; i < 25; i++) {
+  for (let i = 0; i < 40; i++) {
     const customer = getRandomItem(customers);
     const sources = [PointsSource.REFERRAL_REWARD, PointsSource.PURCHASE_REDEEM, PointsSource.ROLLBACK, PointsSource.ADMIN_ADJUSTMENT];
     const source = getRandomItem(sources);
@@ -644,34 +673,44 @@ async function main() {
     });
   }
 
-  console.log('🎯 Created 25 additional point entries');
+  console.log('🎯 Created 40 additional point entries');
 
   console.log('✅ Database seeding completed successfully!');
   console.log('\n📊 Data Summary:');
-  console.log(`👥 Users: 10 (5 Organizers, 5 Customers)`);
-  console.log(`🎪 Events: 15 (Across 8 categories with realistic titles and descriptions)`);
+  console.log(`👥 Users: 20 (8 Organizers, 12 Customers)`);
+  console.log(`🎪 Events: 25 (Across 8 categories with realistic titles and descriptions)`);
   console.log(`🎫 Ticket Types: ${ticketTypes.length} (Multiple tiers per event)`);
-  console.log(`💰 Transactions: 30 (All statuses: WAITING_PAYMENT, WAITING_ADMIN_CONFIRMATION, DONE, REJECTED, EXPIRED, CANCELED)`);
+  console.log(`💰 Transactions: 50 (All statuses: WAITING_PAYMENT, WAITING_ADMIN_CONFIRMATION, DONE, REJECTED, EXPIRED, CANCELED)`);
   console.log(`⭐ Reviews: ${reviews.length} (For attended events with realistic comments)`);
   console.log(`🎟️ Vouchers: 10 (Percentage and amount discounts with memorable codes)`);
   console.log(`🎁 Coupons: 15 (Customer-specific rewards with themed codes)`);
-  console.log(`🎯 Point Entries: 25+ (Various activities)`);
-  console.log(`📧 Email Notifications: 15 (Various types with realistic templates)`);
+  console.log(`🎯 Point Entries: 40+ (Various activities)`);
+  console.log(`📧 Email Notifications: 25 (Various types with realistic templates)`);
   console.log(`🎁 Referral Relationships: ${referrals.length}`);
   
   console.log('\n🔑 Test Accounts (all use password: password123):');
   console.log('Organizers:');
-  console.log('  - organizer1@example.com (Sarah Johnson)');
-  console.log('  - organizer2@example.com (Michael Chen)');
-  console.log('  - organizer3@example.com (Emily Rodriguez)');
-  console.log('  - organizer4@example.com (David Kim)');
-  console.log('  - organizer5@example.com (Lisa Thompson)');
+  console.log('  - sarah@techventures.com (Sarah Johnson)');
+  console.log('  - michael@musicfest.com (Michael Chen)');
+  console.log('  - emily@businesshub.com (Emily Rodriguez)');
+  console.log('  - david@edulab.com (David Kim)');
+  console.log('  - lisa@artgallery.com (Lisa Thompson)');
+  console.log('  - james@sportsevents.com (James Wilson)');
+  console.log('  - maria@communityhub.com (Maria Garcia)');
+  console.log('  - alex@startupinc.com (Alex Brown)');
   console.log('Customers:');
-  console.log('  - customer1@example.com (John Smith)');
-  console.log('  - customer2@example.com (Maria Garcia)');
-  console.log('  - customer3@example.com (Ahmed Hassan)');
-  console.log('  - customer4@example.com (Jennifer Lee)');
-  console.log('  - customer5@example.com (Robert Wilson)');
+  console.log('  - john.smith@gmail.com (John Smith)');
+  console.log('  - maria.garcia@yahoo.com (Maria Garcia)');
+  console.log('  - ahmed.hassan@outlook.com (Ahmed Hassan)');
+  console.log('  - jennifer.lee@hotmail.com (Jennifer Lee)');
+  console.log('  - robert.wilson@gmail.com (Robert Wilson)');
+  console.log('  - anna.kowalski@gmail.com (Anna Kowalski)');
+  console.log('  - carlos.rodriguez@yahoo.com (Carlos Rodriguez)');
+  console.log('  - sophie.martin@outlook.com (Sophie Martin)');
+  console.log('  - kevin.park@gmail.com (Kevin Park)');
+  console.log('  - emma.thompson@hotmail.com (Emma Thompson)');
+  console.log('  - daniel.kim@gmail.com (Daniel Kim)');
+  console.log('  - lisa.anderson@yahoo.com (Lisa Anderson)');
   
   console.log('\n🎟️ Sample Voucher Codes:');
   console.log('EARLYBIRD20, SUMMER15, TECH10, MUSIC25, BUSINESS30, etc.');
@@ -680,12 +719,12 @@ async function main() {
   console.log('WELCOME10, FIRST15, LOYAL20, VIP25, SPECIAL30, etc.');
   
   console.log('\n📈 Transaction Status Distribution:');
-  console.log('- WAITING_PAYMENT: 3 transactions');
-  console.log('- WAITING_ADMIN_CONFIRMATION: 3 transactions');
-  console.log('- DONE: 5 transactions');
-  console.log('- REJECTED: 2 transactions');
-  console.log('- EXPIRED: 2 transactions');
-  console.log('- CANCELED: 2 transactions');
+  console.log('- WAITING_PAYMENT: 5 transactions');
+  console.log('- WAITING_ADMIN_CONFIRMATION: 5 transactions');
+  console.log('- DONE: 15 transactions');
+  console.log('- REJECTED: 5 transactions');
+  console.log('- EXPIRED: 5 transactions');
+  console.log('- CANCELED: 5 transactions');
   
   console.log('\n🎪 Sample Events:');
   console.log('- Tech Conference 2024');
