@@ -1,3 +1,29 @@
 node_modules
 .env
 /src/generated/prisma
+
+# Build output
+dist/
+*.js
+*.d.ts
+*.js.map
+*.d.ts.map
+tsconfig.tsbuildinfo
+
+# Test output
+tests/*.js
+tests/*.d.ts
+tests/*.js.map
+tests/*.d.ts.map
+
+# Prisma output
+prisma/seed.js
+prisma/seed.d.ts
+prisma/seed.js.map
+prisma/seed.d.ts.map
+
+# Middleware output
+src/middleware/validator/*.js
+src/middleware/validator/*.d.ts
+src/middleware/validator/*.js.map
+src/middleware/validator/*.d.ts.map

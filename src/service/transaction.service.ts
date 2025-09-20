@@ -258,6 +258,26 @@ export class TransactionService {
     return { expiredCount: overdue.length };
   }
 
+  async autoCancelOverdueTransactions() {
+    const now = new Date();
+    const overdue = await prisma.transaction.findMany({
+      where: {
+        status: 'WAITING_ADMIN_CONFIRMATION',
+        organizerDecisionBy: { lt: now }
+      },
+      include: { items: true }
+    });
+
+    console.log(`[SCHEDULER] Found ${overdue.length} overdue transactions for auto-cancellation at ${now.toISOString()}`);
+    
+    for (const txn of overdue) {
+      console.log(`[SCHEDULER] Auto-cancelling transaction ${txn.id}, decision by ${txn.organizerDecisionBy}, now ${now}`);
+      await this._rollbackTransaction(txn);
+    }
+
+    return { cancelledCount: overdue.length };
+  }
+
   async autoCancelStaleTransactions() {
     const now = new Date();
     const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000); // 3 days ago

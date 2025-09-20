@@ -73,7 +73,6 @@ export class EventService {
     }
     
     // Debug: log incoming keys to spot wrong field names from client
-    try { console.log('[updateEvent] incoming keys:', Object.keys(data || {})); } catch {}
 
     const updateData: any = {};
     if (data.title !== undefined) updateData.title = data.title;
@@ -127,6 +126,29 @@ export class EventService {
     }
     
     return prisma.event.delete({ where: { id: eventId, organizerId } });
+  }
+
+  async publishEvent(eventId: number, organizerId: number) {
+    const existingEvent = await prisma.event.findUnique({
+      where: { id: eventId }
+    });
+
+    if (!existingEvent) {
+      throw { status: 404, message: 'Event not found' };
+    }
+
+    if (existingEvent.organizerId !== organizerId) {
+      throw { status: 403, message: 'You can only publish your own events' };
+    }
+
+    if (existingEvent.status === 'PUBLISHED') {
+      throw { status: 400, message: 'Event is already published' };
+    }
+
+    return prisma.event.update({
+      where: { id: eventId },
+      data: { status: 'PUBLISHED' }
+    });
   }
   async listEvents(params: any) {
     const { category, q, location, status, startAt, endAt } = params;

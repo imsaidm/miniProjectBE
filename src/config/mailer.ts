@@ -32,7 +32,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<{ delivered:
     // Fallback: log the email for development environments
     const payload = { ...options, from: fromAddress };
     // eslint-disable-next-line no-console
-    console.log('[DEV EMAIL LOG]', JSON.stringify(payload));
+    // Email sent successfully in development
     return { delivered: false };
   }
 

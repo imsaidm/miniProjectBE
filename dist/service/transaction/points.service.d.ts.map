@@ -1,1 +1,0 @@
-{"version":3,"file":"points.service.d.ts","sourceRoot":"","sources":["../../../src/service/transaction/points.service.ts"],"names":[],"mappings":"AAEA,qBAAa,aAAa;IAClB,uBAAuB,CAAC,MAAM,EAAE,MAAM;IAoBtC,oBAAoB,CAAC,MAAM,EAAE,MAAM,EAAE,UAAU,EAAE,MAAM,EAAE,EAAE,EAAE,GAAG;IAwBhE,YAAY,CAAC,MAAM,EAAE,MAAM,EAAE,UAAU,EAAE,MAAM,EAAE,EAAE,EAAE,GAAG;CAY/D;;AAED,wBAAmC"}

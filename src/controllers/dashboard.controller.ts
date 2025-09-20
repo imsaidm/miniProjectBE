@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import DashboardService from '../service/dashboard.service';
+import { prisma } from '../config/prisma';
 
 export class DashboardController {
   /**
@@ -136,8 +137,18 @@ export class DashboardController {
         });
       }
 
-      // TODO: Add authorization check to ensure user owns this event
-      // This would require an additional service method to verify event ownership
+      // Authorization check: ensure user owns this event
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { organizerId: true }
+      });
+      
+      if (!event || event.organizerId !== organizerId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only view attendees for your own events.'
+        });
+      }
 
       const result = await DashboardService.getEventAttendees(eventId);
       
@@ -177,8 +188,18 @@ export class DashboardController {
         });
       }
 
-      // TODO: Add authorization check to ensure user owns this event
-      // This would require an additional service method to verify event ownership
+      // Authorization check: ensure user owns this event
+      const event = await prisma.event.findUnique({
+        where: { id: eventId },
+        select: { organizerId: true }
+      });
+      
+      if (!event || event.organizerId !== organizerId) {
+        return res.status(403).json({
+          success: false,
+          message: 'Access denied. You can only view attendees for your own events.'
+        });
+      }
 
       const result = await DashboardService.getEventTransactions(eventId);
       
